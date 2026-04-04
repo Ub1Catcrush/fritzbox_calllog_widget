@@ -21,13 +21,19 @@ jobs:
         run: chmod +x gradlew
         
       - name: Build debug APK
-        run: bash ./gradlew assembleDebug --stacktrace
+        run: bash ./gradlew assemble --stacktrace
         
-      - name: Upload APK to Github Artifacts
+      - name: Upload Debug APK to Github Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: app
+          name: app debug
           path: app/build/outputs/apk/debug/app-debug.apk
+      
+      - name: Upload Release APK to Github Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: app release
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: Create Release
         id: create_release
@@ -40,8 +46,8 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload APK to Release
-        id: upload-release-asset 
+      - name: Upload Debug APK to Release
+        id: upload-release-asset-debug
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
@@ -49,4 +55,15 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./app/build/outputs/apk/debug/app-debug.apk
           asset_name: app-debug.apk
+          asset_content_type: application/zip
+          
+      - name: Upload Release APK to Release
+        id: upload-release-asset-release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./app/build/outputs/apk/release/app-release.apk
+          asset_name: app-release.apk
           asset_content_type: application/zip
