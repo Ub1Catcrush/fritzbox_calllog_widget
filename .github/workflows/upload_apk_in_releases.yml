@@ -22,18 +22,12 @@ jobs:
         
       - name: Build debug APK
         run: bash ./gradlew assemble --stacktrace
-        
-      - name: Upload Debug APK to Github Artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: app debug
-          path: app/build/outputs/apk/debug/app-debug.apk
       
-      - name: Upload Release APK to Github Artifacts
+      - name: Upload APKs to Github Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: app release
-          path: app/build/outputs/apk/release/app-release.apk
+          name: build-outputs
+          path: app/build/outputs/apk/**/*.apk
 
       - name: Create Release
         id: create_release
@@ -45,25 +39,23 @@ jobs:
           release_name: Automatic Release ${{ github.run_number }}
           draft: false
           prerelease: false
-
+      
       - name: Upload Debug APK to Release
-        id: upload-release-asset-debug
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./app/build/outputs/apk/debug/app-debug.apk
+          asset_path: app/build/outputs/apk/debug/app-debug.apk
           asset_name: app-debug.apk
-          asset_content_type: application/zip
-          
+          asset_content_type: application/vnd.android.package-archive
+      
       - name: Upload Release APK to Release
-        id: upload-release-asset-release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./app/build/outputs/apk/release/app-release.apk
+          asset_path: app/build/outputs/apk/release/app-release-unsigned.apk
           asset_name: app-release.apk
-          asset_content_type: application/zip
+          asset_content_type: application/vnd.android.package-archive
