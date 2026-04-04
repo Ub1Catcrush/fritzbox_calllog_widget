@@ -1,0 +1,5 @@
+Bitte lade die gradle-wrapper.jar manuell herunter:
+  https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar
+Und lege sie in dieses Verzeichnis: gradle/wrapper/gradle-wrapper.jar
+
+Alternativ: Android Studio lädt den Wrapper automatisch beim ersten Öffnen.

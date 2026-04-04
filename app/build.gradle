@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+//    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace='com.tvcs.fritzboxcallwidget'
+    compileSdk=36
+
+    defaultConfig {
+        applicationId="com.tvcs.fritzboxcallwidget"
+        minSdk=26
+        targetSdk=34
+        versionCode=1
+        versionName="1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled=false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility=JavaVersion.VERSION_17
+        targetCompatibility=JavaVersion.VERSION_17
+    }
+
+//    kotlinOptions {
+//        jvmTarget = '17'
+//    }
+
+    buildFeatures {
+        viewBinding=true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.18.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'com.google.android.material:material:1.13.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.preference:preference-ktx:1.2.1'
+    implementation 'androidx.work:work-runtime-ktx:2.11.2'
+
+    // HTTP client for FritzBox TR-064 API
+    implementation 'com.squareup.okhttp3:okhttp:5.3.2'
+    implementation 'com.squareup.okhttp3:logging-interceptor:5.3.2'
+
+    // XML parsing for TR-064 SOAP responses
+    implementation 'org.simpleframework:simple-xml:2.7.1'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+}

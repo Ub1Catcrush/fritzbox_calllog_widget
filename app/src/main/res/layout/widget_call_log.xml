@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    No padding, no rounded corners — the widget fills the exact space the launcher
+    allocates. Rounded corners / margins are handled by the launcher itself on
+    Android 12+ (enforced clipping). Setting our own rounded background inside
+    the allocated space creates a visible gap around the content.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/widget_bg">
+
+    <!-- Header -->
+    <RelativeLayout
+        android:id="@+id/header_row"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:background="@color/widget_header_bg">
+
+        <TextView
+            android:id="@+id/tv_widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:text="@string/widget_title"
+            android:textColor="@color/widget_header_text"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:paddingStart="8dp" />
+
+        <ImageView
+            android:id="@+id/btn_settings"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="4dp"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="@string/settings_title" />
+
+        <ImageView
+            android:id="@+id/btn_refresh"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_toStartOf="@id/btn_settings"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="2dp"
+            android:src="@drawable/ic_refresh"
+            android:contentDescription="@string/refresh" />
+    </RelativeLayout>
+
+    <!-- Column headers -->
+    <LinearLayout
+        android:id="@+id/col_header_row"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:orientation="horizontal"
+        android:background="@color/widget_col_header_bg"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:id="@+id/tv_col_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/col_date"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_col_header_text"
+            android:paddingEnd="6dp" />
+
+        <TextView
+            android:id="@+id/tv_col_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/col_time"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_col_header_text"
+            android:paddingEnd="6dp" />
+
+        <TextView
+            android:layout_width="20dp"
+            android:layout_height="wrap_content"
+            android:text="" />
+
+        <TextView
+            android:id="@+id/tv_col_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/col_name"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_col_header_text" />
+    </LinearLayout>
+
+    <!-- Loading -->
+    <TextView
+        android:id="@+id/widget_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/loading"
+        android:textSize="12sp"
+        android:textColor="@color/widget_text_secondary"
+        android:visibility="gone" />
+
+    <!-- Error -->
+    <TextView
+        android:id="@+id/tv_error"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="8dp"
+        android:gravity="center"
+        android:textColor="@color/error_text"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <!-- Call list: weight=1 fills all remaining height exactly -->
+    <ListView
+        android:id="@+id/list_calls"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp"
+        android:scrollbars="none"
+        android:visibility="gone" />
+
+    <!-- Empty state -->
+    <TextView
+        android:id="@+id/tv_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/no_calls"
+        android:textSize="12sp"
+        android:textColor="@color/widget_text_secondary"
+        android:padding="16dp"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">FritzBox CallLog Widget</string>
+    <string name="widget_name">FritzBox Call Log</string>
+    <string name="widget_title">📞 Calls</string>
+    <string name="widget_description">Displays the FritzBox call log</string>
+    <string name="widget_configure">Configure Widget</string>
+    <string name="widget_config_hint">Please configure the FritzBox connection first, then add the widget.</string>
+    <string name="settings_title">FritzBox CallLog</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="add_widget">Add Widget</string>
+    <string name="refresh">Refresh</string>
+    <string name="loading">Loading…</string>
+    <string name="no_calls">No calls</string>
+    <!-- Column headers -->
+    <string name="col_date">Date</string>
+    <string name="col_time">Time</string>
+    <string name="col_name">Name / Number</string>
+    <!-- Pref categories -->
+    <string name="pref_category_connection">Connection</string>
+    <string name="pref_category_refresh">Refresh &amp; Data</string>
+    <string name="pref_category_phone">Phone</string>
+    <string name="pref_category_display">Appearance</string>
+    <string name="pref_category_colors">Widget Colors</string>
+    <string name="pref_category_actions">Actions</string>
+    <!-- Connection prefs -->
+    <string name="pref_host_title">FritzBox Address</string>
+    <string name="pref_host_summary">Hostname or IP (e.g. fritz.box or 192.168.178.1)</string>
+    <string name="pref_port_title">TR-064 Port</string>
+    <string name="pref_port_summary">Default: 49000 (HTTP) or 49443 (HTTPS)</string>
+    <string name="pref_username_title">Username</string>
+    <string name="pref_username_summary">FritzBox user (leave empty if none set)</string>
+    <string name="pref_password_title">Password</string>
+    <string name="pref_password_summary">FritzBox password</string>
+    <string name="pref_https_title">Use HTTPS</string>
+    <string name="pref_https_summary">Encrypted connection (self-signed certificate accepted)</string>
+    <!-- Refresh prefs -->
+    <string name="pref_refresh_title">Refresh interval (seconds)</string>
+    <string name="pref_refresh_summary">How often to fetch the call log. Minimum recommended: 60</string>
+    <string name="pref_max_entries_title">Maximum entries</string>
+    <string name="pref_max_entries_summary">Number of calls shown in the widget</string>
+    <string name="pref_prefix_title">Phone number prefix</string>
+    <string name="pref_prefix_summary">Replaces leading 0 (e.g. +49 → 0621… becomes +4921…)</string>
+    <!-- Display prefs -->
+    <string name="pref_language_title">Language</string>
+    <string name="pref_theme_title">Appearance</string>
+    <string name="pref_font_family_title">Font</string>
+    <string name="pref_font_size_title">Font size</string>
+    <string name="font_default">System default</string>
+    <!-- Theme / language values -->
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="lang_system">System default</string>
+    <!-- Color prefs -->
+    <string name="pref_color_summary">ARGB hex, e.g. #FF1565C0. Leave empty for theme default.</string>
+    <string name="pref_color_header_bg">Header background</string>
+    <string name="pref_color_header_text">Header text</string>
+    <string name="pref_color_col_header_bg">Column header background</string>
+    <string name="pref_color_col_header_text">Column header text</string>
+    <string name="pref_color_widget_bg">Widget background</string>
+    <string name="pref_color_row_even">Even row background</string>
+    <string name="pref_color_row_odd">Odd row background</string>
+    <string name="pref_color_text_primary">Primary text</string>
+    <string name="pref_color_text_secondary">Secondary text</string>
+    <string name="pref_color_divider">Divider</string>
+    <string name="pref_color_error">Error text</string>
+    <string name="pref_reset_colors_title">Reset colors to theme defaults</string>
+    <string name="pref_reset_colors_summary">Clears all custom colors</string>
+    <!-- Actions -->
+    <string name="pref_test_title">Test connection</string>
+    <string name="pref_test_summary">Test FritzBox connection and show call count</string>
+    <!-- Messages -->
+    <string name="testing_connection">Testing connection…</string>
+    <string name="connection_success">✓ Connected! %d calls found.</string>
+    <string name="connection_failed">✗ Error: %s</string>
+    <string name="error_loading">Error loading:\n%s</string>
+    <string name="colors_reset">Colors reset to theme defaults.</string>
+    <string name="pref_category_colors_light">Light Mode Colors</string>
+    <string name="pref_category_colors_dark">Dark Mode Colors</string>
+</resources>

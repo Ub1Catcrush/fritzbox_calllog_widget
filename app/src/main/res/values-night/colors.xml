@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#F0212121</color>
+    <color name="widget_header_bg">#FF0D47A1</color>
+    <color name="widget_header_text">#FFE3F2FD</color>
+    <color name="widget_col_header_bg">#FF1A237E</color>
+    <color name="widget_col_header_text">#FF90CAF9</color>
+    <color name="widget_text_primary">#FFE0E0E0</color>
+    <color name="widget_text_secondary">#FF9E9E9E</color>
+    <color name="divider">#FF424242</color>
+    <color name="row_even">#FF212121</color>
+    <color name="row_odd">#FF2C2C2C</color>
+    <color name="error_text">#FFEF9A9A</color>
+</resources>
