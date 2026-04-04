@@ -9,17 +9,21 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.RequiresApi
 import com.tvcs.fritzboxcallwidget.R
 import com.tvcs.fritzboxcallwidget.api.CallRepository
 import com.tvcs.fritzboxcallwidget.model.CallEntry
+import com.tvcs.fritzboxcallwidget.model.CallType
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
 import com.tvcs.fritzboxcallwidget.prefs.SettingsActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.time.format.DateTimeFormatter
 
 class CallLogWidget : AppWidgetProvider() {
 
@@ -53,12 +57,10 @@ class CallLogWidget : AppWidgetProvider() {
     override fun onAppWidgetOptionsChanged(
         context: Context, manager: AppWidgetManager, id: Int, newOptions: Bundle
     ) {
-        // Called when the widget is resized — rebuild with current data
         val cached = CallLogRemoteViewsService.getCalls()
         if (cached.isNotEmpty()) {
             val prefs = AppPreferences(context)
-            updateWidget(context, manager, id,
-                State.Success(cached.take(prefs.maxEntries)), prefs)
+            updateWidget(context, manager, id, State.Success(cached.take(prefs.maxEntries)), prefs)
         } else {
             fetchAndUpdate(context, manager, intArrayOf(id))
         }
@@ -103,9 +105,9 @@ class CallLogWidget : AppWidgetProvider() {
     private fun showLoading(context: Context, manager: AppWidgetManager, id: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_call_log)
         views.setViewVisibility(R.id.widget_loading, View.VISIBLE)
-        views.setViewVisibility(R.id.tv_error,   View.GONE)
-        views.setViewVisibility(R.id.list_calls, View.GONE)
-        views.setViewVisibility(R.id.tv_empty,   View.GONE)
+        views.setViewVisibility(R.id.tv_error,       View.GONE)
+        views.setViewVisibility(R.id.list_calls,     View.GONE)
+        views.setViewVisibility(R.id.tv_empty,       View.GONE)
         manager.updateAppWidget(id, views)
     }
 
@@ -118,26 +120,18 @@ class CallLogWidget : AppWidgetProvider() {
         state: State,
         prefs: AppPreferences = AppPreferences(context)
     ) {
-        val isDark = prefs.effectiveIsDark(context)
-
-        // Resolve colors: use saved pref if set, otherwise theme default
         val colors = prefs.resolvedColors(context)
+        val ctx    = SettingsActivity.wrapLocale(context, prefs.language)
+        val views  = RemoteViews(context.packageName, R.layout.widget_call_log)
 
-        val views = RemoteViews(context.packageName, R.layout.widget_call_log)
-
-        // Apply background and header colors
+        // Header colors and localized text
         views.setInt(R.id.widget_root,    "setBackgroundColor", colors.widgetBg)
         views.setInt(R.id.header_row,     "setBackgroundColor", colors.headerBg)
         views.setInt(R.id.col_header_row, "setBackgroundColor", colors.colHeaderBg)
-
-        // Header text/icon colors
         views.setTextColor(R.id.tv_widget_title, colors.headerText)
         views.setTextColor(R.id.tv_col_date,     colors.colHeaderText)
         views.setTextColor(R.id.tv_col_time,     colors.colHeaderText)
         views.setTextColor(R.id.tv_col_name,     colors.colHeaderText)
-
-        // Localized header texts
-        val ctx = SettingsActivity.wrapLocale(context, prefs.language)
         views.setTextViewText(R.id.tv_widget_title, ctx.getString(R.string.widget_title))
         views.setTextViewText(R.id.tv_col_date,     ctx.getString(R.string.col_date))
         views.setTextViewText(R.id.tv_col_time,     ctx.getString(R.string.col_time))
@@ -156,56 +150,128 @@ class CallLogWidget : AppWidgetProvider() {
         when (state) {
             is State.Loading -> {
                 views.setViewVisibility(R.id.widget_loading, View.VISIBLE)
-                views.setViewVisibility(R.id.tv_error,   View.GONE)
-                views.setViewVisibility(R.id.list_calls, View.GONE)
-                views.setViewVisibility(R.id.tv_empty,   View.GONE)
+                views.setViewVisibility(R.id.tv_error,       View.GONE)
+                views.setViewVisibility(R.id.list_calls,     View.GONE)
+                views.setViewVisibility(R.id.tv_empty,       View.GONE)
                 views.setTextViewText(R.id.widget_loading, ctx.getString(R.string.loading))
                 views.setTextColor(R.id.widget_loading, colors.textSecondary)
             }
+
             is State.Error -> {
                 views.setViewVisibility(R.id.widget_loading, View.GONE)
-                views.setViewVisibility(R.id.tv_error,   View.VISIBLE)
-                views.setViewVisibility(R.id.list_calls, View.GONE)
-                views.setViewVisibility(R.id.tv_empty,   View.GONE)
+                views.setViewVisibility(R.id.tv_error,       View.VISIBLE)
+                views.setViewVisibility(R.id.list_calls,     View.GONE)
+                views.setViewVisibility(R.id.tv_empty,       View.GONE)
                 views.setTextViewText(R.id.tv_error,
                     ctx.getString(R.string.error_loading, state.message))
                 views.setTextColor(R.id.tv_error, colors.error)
             }
+
             is State.Success -> {
                 val hasCalls = state.calls.isNotEmpty()
                 views.setViewVisibility(R.id.widget_loading, View.GONE)
-                views.setViewVisibility(R.id.tv_error,   View.GONE)
-                views.setViewVisibility(R.id.list_calls, if (hasCalls) View.VISIBLE else View.GONE)
-                views.setViewVisibility(R.id.tv_empty,   if (hasCalls) View.GONE else View.VISIBLE)
+                views.setViewVisibility(R.id.tv_error,       View.GONE)
+                views.setViewVisibility(R.id.list_calls,     if (hasCalls) View.VISIBLE else View.GONE)
+                views.setViewVisibility(R.id.tv_empty,       if (hasCalls) View.GONE   else View.VISIBLE)
                 views.setTextViewText(R.id.tv_empty, ctx.getString(R.string.no_calls))
                 views.setTextColor(R.id.tv_empty, colors.textSecondary)
 
                 if (hasCalls) {
-                    CallLogRemoteViewsService.update(state.calls, colors, prefs.fontSizeSp)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        // API 31+: use RemoteCollectionItems — no service, no deprecated calls.
+                        // Each row carries its own PendingIntent (unique request code per entry),
+                        // so no fill-in template mechanism is needed.
+                        views.setRemoteAdapter(
+                            R.id.list_calls,
+                            buildCollectionItems(context, state.calls, colors, prefs.fontSizeSp)
+                        )
+                    } else {
+                        // API 26–30: fall back to the service-based adapter.
+                        CallLogRemoteViewsService.update(state.calls, colors, prefs.fontSizeSp)
+                        val svcIntent = Intent(context, CallLogRemoteViewsService::class.java).apply {
+                            data = Uri.parse("fritz://calllog?t=${System.currentTimeMillis()}")
+                        }
+                        @Suppress("DEPRECATION")
+                        views.setRemoteAdapter(R.id.list_calls, svcIntent)
 
-                    val svcIntent = Intent(context, CallLogRemoteViewsService::class.java).apply {
-                        data = Uri.parse("fritz://calllog?t=${System.currentTimeMillis()}")
+                        // Template intent: explicit → MUTABLE allowed on API 26–30
+                        views.setPendingIntentTemplate(
+                            R.id.list_calls,
+                            PendingIntent.getActivity(context, 2,
+                                Intent(context, DialActivity::class.java), mutableFlags())
+                        )
                     }
-                    views.setRemoteAdapter(R.id.list_calls, svcIntent)
-
-                    views.setPendingIntentTemplate(
-                        R.id.list_calls,
-                        PendingIntent.getActivity(context, 2,
-                            Intent(context, DialActivity::class.java),
-                            mutableFlags())
-                    )
-
-                    manager.notifyAppWidgetViewDataChanged(id, R.id.list_calls)
                 }
             }
         }
 
+        // Standard updateAppWidget — no notifyAppWidgetViewDataChanged needed
         manager.updateAppWidget(id, views)
+    }
+
+    // ── RemoteCollectionItems builder (API 31+) ───────────────────────────────
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun buildCollectionItems(
+        context: Context,
+        calls: List<CallEntry>,
+        colors: WidgetColors,
+        fontSizeSp: Float
+    ): RemoteViews.RemoteCollectionItems {
+        val pkg     = context.packageName
+        val dateFmt = DateTimeFormatter.ofPattern("dd.MM.")
+        val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+
+        val builder = RemoteViews.RemoteCollectionItems.Builder()
+            .setHasStableIds(true)
+            .setViewTypeCount(1)
+
+        calls.forEachIndexed { index, entry ->
+            val row = RemoteViews(pkg, R.layout.widget_call_row)
+
+            row.setTextViewText(R.id.tv_date, entry.date.format(dateFmt))
+            row.setTextViewText(R.id.tv_time, entry.date.format(timeFmt))
+            row.setTextViewText(R.id.tv_name, entry.displayName)
+
+            row.setTextColor(R.id.tv_date, colors.textPrimary)
+            row.setTextColor(R.id.tv_time, colors.textSecondary)
+            row.setTextColor(R.id.tv_name, colors.textPrimary)
+
+            row.setTextViewTextSize(R.id.tv_date, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
+            row.setTextViewTextSize(R.id.tv_time, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
+            row.setTextViewTextSize(R.id.tv_name, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
+
+            val iconRes = when (entry.type) {
+                CallType.INCOMING -> R.drawable.ic_call_incoming
+                CallType.OUTGOING -> R.drawable.ic_call_outgoing
+                CallType.MISSED   -> R.drawable.ic_call_missed
+            }
+            row.setImageViewResource(R.id.iv_call_type, iconRes)
+
+            val bgColor = if (index % 2 == 0) colors.rowEven else colors.rowOdd
+            row.setInt(R.id.row_root, "setBackgroundColor", bgColor)
+
+            // Each row gets its own PendingIntent directly — no template/fill-in needed.
+            // Request codes start at 100 to avoid collisions with header button codes (0, 1).
+            val dialIntent = Intent(context, DialActivity::class.java).apply {
+                putExtra(DialActivity.EXTRA_NUMBER, entry.number)
+            }
+            val dialPi = PendingIntent.getActivity(
+                context,
+                100 + index,   // unique request code per row
+                dialIntent,
+                mutableFlags()
+            )
+            row.setOnClickPendingIntent(R.id.row_root, dialPi)
+
+            builder.addItem(index.toLong(), row)
+        }
+
+        return builder.build()
     }
 }
 
-/** Resolved color set for a single widget render.
- *  Instantiated via AppPreferences.resolvedColors(context). */
+/** Resolved color set for a single widget render. */
 data class WidgetColors(
     val headerBg: Int,
     val headerText: Int,

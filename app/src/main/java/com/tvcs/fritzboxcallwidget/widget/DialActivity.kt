@@ -15,18 +15,14 @@ class DialActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Log all extras for debugging
-        intent?.extras?.keySet()?.forEach { key ->
-            Log.d(TAG, "Extra: $key = ${intent.extras?.get(key)}")
-        }
-
+        // Use typed getStringExtra — avoids deprecated Bundle.get(String): Any?
         val number = intent?.getStringExtra(EXTRA_NUMBER)
-        Log.d(TAG, "Dialling number: '$number'")
+        Log.d(TAG, "Dialling: '$number'")
 
         if (!number.isNullOrBlank()) {
             startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")))
         } else {
-            Log.w(TAG, "No number received — intent data: ${intent?.data}, extras: ${intent?.extras}")
+            Log.w(TAG, "No number in intent extras")
         }
         finish()
     }
