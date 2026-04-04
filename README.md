@@ -108,4 +108,4 @@ CallLogWidget (AppWidgetProvider)
 ---
 
 ## Lizenz
-MIT
+GNU GENERAL PUBLIC LICENSE Version 3
