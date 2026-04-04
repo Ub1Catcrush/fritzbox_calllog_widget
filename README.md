@@ -2,6 +2,8 @@
 
 Ein anpassbares Android-Homescreen-Widget, das das Anrufprotokoll deiner FritzBox über die TR-064 API abruft und als scrollbare Tabelle anzeigt.
 
+<img width="681" height="1308" alt="image" src="https://github.com/user-attachments/assets/4a0bb655-7b3f-432c-8865-93635f1e531d" />
+
 ---
 
 ## Features
