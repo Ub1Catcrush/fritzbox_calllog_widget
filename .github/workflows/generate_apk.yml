@@ -4,12 +4,10 @@ on:
     branches: [ master ]
     
 jobs:
-  # A job to generate debug APK and upload on Github Artifacts
   apk:
       name: Generate APK
       runs-on: ubuntu-24.04
-
-    steps:
+      steps:
         - uses: actions/checkout@v6
         - name: set up JDK
           uses: actions/setup-java@v5
