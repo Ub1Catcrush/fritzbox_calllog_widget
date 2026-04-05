@@ -178,12 +178,18 @@ class CallLogWidget : AppWidgetProvider() {
 
                 if (hasCalls) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        // API 31+: use RemoteCollectionItems — no service, no deprecated calls.
-                        // Each row carries its own PendingIntent (unique request code per entry),
-                        // so no fill-in template mechanism is needed.
+                        // API 31+: RemoteCollectionItems does NOT support setOnClickPendingIntent
+                        // per row — clicks must still use setPendingIntentTemplate + fill-in.
+                        // The template targets DialActivity (explicit → MUTABLE allowed).
+                        // Each row's fill-in supplies the tel: URI via FILL_IN_DATA.
+                        views.setPendingIntentTemplate(
+                            R.id.list_calls,
+                            PendingIntent.getActivity(context, 2,
+                                Intent(context, DialActivity::class.java), mutableFlags())
+                        )
                         views.setRemoteAdapter(
                             R.id.list_calls,
-                            buildCollectionItems(context, state.calls, colors, prefs.fontSizeSp)
+                            buildCollectionItems(state.calls, colors, prefs.fontSizeSp)
                         )
                     } else {
                         // API 26–30: fall back to the service-based adapter.
@@ -213,12 +219,11 @@ class CallLogWidget : AppWidgetProvider() {
 
     @RequiresApi(Build.VERSION_CODES.S)
     private fun buildCollectionItems(
-        context: Context,
         calls: List<CallEntry>,
         colors: WidgetColors,
         fontSizeSp: Float
     ): RemoteViews.RemoteCollectionItems {
-        val pkg     = context.packageName
+        val pkg     = "com.tvcs.fritzboxcallwidget"
         val dateFmt = DateTimeFormatter.ofPattern("dd.MM.")
         val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -251,18 +256,18 @@ class CallLogWidget : AppWidgetProvider() {
             val bgColor = if (index % 2 == 0) colors.rowEven else colors.rowOdd
             row.setInt(R.id.row_root, "setBackgroundColor", bgColor)
 
-            // Each row gets its own PendingIntent directly — no template/fill-in needed.
-            // Request codes start at 100 to avoid collisions with header button codes (0, 1).
-            val dialIntent = Intent(context, DialActivity::class.java).apply {
+            // RemoteCollectionItems rows must use setOnClickFillInIntent + template,
+            // NOT setOnClickPendingIntent (which is silently ignored in collection rows).
+            // The fill-in intent carries the tel: URI as data.
+            // FILL_IN_DATA tells Android to overwrite the template's data with ours.
+            // The fill-in intent carries the phone number as an extra.
+            // Extras are always merged by Android's Intent.fillIn() regardless of flags,
+            // so no special FILL_IN_* flag is needed.
+            // DialActivity reads EXTRA_NUMBER and opens the system dialler.
+            val fillIn = Intent().apply {
                 putExtra(DialActivity.EXTRA_NUMBER, entry.number)
             }
-            val dialPi = PendingIntent.getActivity(
-                context,
-                100 + index,   // unique request code per row
-                dialIntent,
-                mutableFlags()
-            )
-            row.setOnClickPendingIntent(R.id.row_root, dialPi)
+            row.setOnClickFillInIntent(R.id.row_root, fillIn)
 
             builder.addItem(index.toLong(), row)
         }
