@@ -122,8 +122,8 @@ class FritzBoxClient(
                 type = call.getChildText("Type").toIntOrNull() ?: 0,
                 date = call.getChildText("Date"),
                 name = call.getChildText("Name"),
-                number = call.getChildText("Number"),
                 duration = call.getChildText("Duration"),
+                caller = call.getChildText("Caller"),
                 called = call.getChildText("Called")
             )
             result.add(entry)
@@ -265,8 +265,8 @@ data class FritzCallEntry(
     val type: Int,
     val date: String,   // Format: "DD.MM.YY HH:MM"
     val name: String,
-    val number: String,
     val duration: String,
+    val caller: String,
     val called: String
 )
 

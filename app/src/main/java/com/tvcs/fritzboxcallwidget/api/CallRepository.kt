@@ -64,7 +64,7 @@ class CallRepository(private val prefs: AppPreferences) {
         val rawNumber = if (type == CallType.OUTGOING && raw.called.isNotBlank()) {
             raw.called
         } else {
-            raw.number
+            raw.caller
         }
 
         // Apply prefix if number doesn't already start with + or 0
