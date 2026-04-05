@@ -172,4 +172,4 @@ SettingsActivity
 
 ## Lizenz
 
-GNU General Public License Version 3 – siehe [LICENSE](LICENSE)
+GNU General Public License Version 3 – siehe [LICENCE](LICENCE)
