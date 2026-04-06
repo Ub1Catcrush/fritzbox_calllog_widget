@@ -6,12 +6,16 @@ on:
     paths:
       - 'app/**'
       - 'app/*'
+      - 'gradle/**'
+      - 'gradle/*'
   pull_request:
     branches:
       - 'master'
     paths:
       - 'app/**'
       - 'app/*'
+      - 'gradle/**'
+      - 'gradle/*'
 
 jobs:
   apk:
