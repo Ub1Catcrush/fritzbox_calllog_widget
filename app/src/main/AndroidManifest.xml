@@ -19,7 +19,7 @@
         <!-- Invisible trampoline so widget row taps can use an explicit,
              FLAG_MUTABLE PendingIntent on Android 14+ -->
         <activity
-            android:name=".widget.DialActivity"
+            android:name="com.tvcs.fritzboxcallwidget.widget.DialActivity"
             android:exported="false"
             android:theme="@android:style/Theme.NoDisplay" />
 
@@ -36,7 +36,7 @@
 
         <!-- Widget Config Activity -->
         <activity
-            android:name=".widget.WidgetConfigActivity"
+            android:name="com.tvcs.fritzboxcallwidget.widget.WidgetConfigActivity"
             android:exported="true"
             android:label="@string/widget_configure">
             <intent-filter>
@@ -46,7 +46,7 @@
 
         <!-- App Widget Provider -->
         <receiver
-            android:name=".widget.CallLogWidget"
+            android:name="com.tvcs.fritzboxcallwidget.widget.CallLogWidget"
             android:exported="true"
             android:label="@string/widget_name">
             <intent-filter>
@@ -60,18 +60,18 @@
 
         <!-- Widget Update Service -->
         <service
-            android:name=".widget.WidgetUpdateService"
+            android:name="com.tvcs.fritzboxcallwidget.widget.WidgetUpdateService"
             android:exported="false" />
 
         <!-- RemoteViews list service for widget ListView -->
         <service
-            android:name=".widget.CallLogRemoteViewsService"
+            android:name="com.tvcs.fritzboxcallwidget.widget.CallLogRemoteViewsService"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
         <!-- Boot receiver to restart periodic updates -->
         <receiver
-            android:name=".widget.BootReceiver"
+            android:name="com.tvcs.fritzboxcallwidget.widget.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
