@@ -33,7 +33,16 @@ jobs:
 
       - name: Grant Permission to Execute
         run: chmod +x gradlew
-        
+      
+      - name: Increment patch version
+        uses: yoichiro/gh-action-increment-value@v5
+        with:
+          target_directory: ''
+          target_file: 'dependencies.gradle'
+          prefix: 'versionPatch:'
+          suffix: ']'
+          commit_message: '[skip ci] Increments the patch version to'
+
       - name: Build debug APK
         run: bash ./gradlew assemble --stacktrace
       
