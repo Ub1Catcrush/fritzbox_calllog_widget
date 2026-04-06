@@ -16,6 +16,7 @@ on:
       - 'app/*'
       - 'gradle/**'
       - 'gradle/*'
+  workflow_dispatch:
 
 jobs:
   apk:
