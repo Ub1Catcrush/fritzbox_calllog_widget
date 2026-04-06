@@ -1,3 +1,5 @@
+apply from: rootProject.file('dependencies.gradle')
+
 // Top-level build file
 buildscript {
     ext.kotlin_version = "2.3.20"
@@ -21,3 +23,4 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+

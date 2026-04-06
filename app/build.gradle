@@ -8,11 +8,12 @@ android {
     compileSdk=36
 
     defaultConfig {
+
         applicationId="com.tvcs.fritzboxcallwidget"
         minSdk=26
         targetSdk=34
-        versionCode=1
-        versionName="1.0"
+        versionName "${app_versions.versionMajor}.${app_versions.versionMinor}.${app_versions.versionPatch}"
+        versionCode app_versions.versionMajor * 1000000 + app_versions.versionMinor * 10000 + app_versions.versionPatch
     }
 
     buildTypes {
