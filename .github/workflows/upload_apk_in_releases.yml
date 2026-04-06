@@ -43,15 +43,9 @@ jobs:
 #          suffix: ']'
 #          commit_message: '[skip ci] Increments the patch version to'
 
-      - name: Build debug APK
+      - name: Build APKs
         run: bash ./gradlew assemble --stacktrace
       
-      - name: Upload APKs to Github Artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-outputs
-          path: app/build/outputs/apk/**/*.apk
-
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1.1.4
@@ -65,6 +59,12 @@ jobs:
 
       - name: Decode keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 -d > my-release-key.jks
+            
+      - name: Align APK
+        run: |
+          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 \
+            app/build/outputs/apk/release/app-release-unsigned.apk \
+            app/build/outputs/apk/release/app-release.apk
 
       - name: Sign APK with apksigner
         run: |
@@ -77,19 +77,20 @@ jobs:
             --v2-signing-enabled true \
             --v3-signing-enabled true \
             --v4-signing-enabled false \
-            app/build/outputs/apk/release/app-release-unsigned.apk
+            app/build/outputs/apk/release/app-release.apk
       
-      - name: Verify APK signature
+      - name: Verify aligned APK signature
         run: |
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify \
             --verbose \
-            app/build/outputs/apk/release/app-release-unsigned.apk
-      
-      - name: Align APK
-        run: |
-          $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 \
-            app/build/outputs/apk/release/app-release-unsigned.apk \
             app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload APKs to Github Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-outputs
+          path: app/build/outputs/apk/**/*.apk
+
 
       - name: Upload Debug APK to Release
         uses: actions/upload-release-asset@v1
