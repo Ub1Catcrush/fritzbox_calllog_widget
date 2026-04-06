@@ -1,0 +1,47 @@
+Categories:
+  - Phone & SMS
+  - Internet
+License: GPL-3.0-only
+SourceCode: https://github.com/Ub1Catcrush/fritzbox_calllog_widget
+IssueTracker: https://github.com/Ub1Catcrush/fritzbox_calllog_widget/issues
+
+AutoName: FritzBox CallLog Widget
+Summary: Displays the FritzBox call log as a resizable home screen widget
+Description: |-
+  A fully customisable Android home screen widget that fetches the call log
+  from an AVM FRITZ!Box router via the TR-064 SOAP API and displays it as a
+  scrollable table with four columns: date, time, call-type icon, and
+  name/number.
+
+  Features:
+
+  * Scrollable call list with incoming (blue arrow), outgoing (green arrow) and missed (red square) call-type icons
+  * Tap any row to open the system phone app with the number pre-filled
+  * Freely resizable from a small tile to full screen; redraws on resize
+  * Manual refresh button and settings button in the widget header
+  * Configurable automatic refresh interval (AlarmManager)
+  * HTTP Digest authentication against the FRITZ!Box TR-064 API
+  * HTTPS support (self-signed certificate accepted)
+  * Phone number prefix: replaces leading 0 with an international prefix (e.g. 0621 becomes +49621)
+  * Fully customisable widget colours with separate sets for light and dark mode, 11 colours each (header, column header, background, even/odd rows, primary/secondary text, divider, error text) via an ARGB colour picker with live preview
+  * Adjustable font size (8-16 sp)
+  * Available in English, German, French, and Spanish; widget labels switch language together with the settings UI
+  * Light/dark mode: follows system setting or can be forced manually
+  * On API 31+ uses RemoteCollectionItems (no background service needed), falls back to RemoteViewsService on API 26-30
+
+RepoType: git
+Repo: https://github.com/Ub1Catcrush/fritzbox_calllog_widget
+
+Builds:
+  - versionName: '1.0'
+    versionCode: 1
+    commit: 9c4f785b10f4fc7d3ccb710d02b1b5e44e907622
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version %v
+UpdateCheckMode: Tags
+UpdateCheckData: app/build.gradle|versionCode=(\d+)|.|versionName="([\d.]+)"
+CurrentVersion: '1.0'
+CurrentVersionCode: 1
