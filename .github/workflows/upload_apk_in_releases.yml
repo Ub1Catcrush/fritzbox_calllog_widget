@@ -130,9 +130,8 @@ jobs:
       
       - name: Verify aligned AAB signature
         run: |
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify \
-            --verbose \
-            app/build/outputs/bundle/release/app-release-signed.aab
+          $ANDROID_HOME/build-tools/34.0.0/bundletool check-bundle-signature \
+            --bundle=app/build/outputs/bundle/release/app-release-signed.aab \
 
       - name: Upload APKs to Github Artifacts
         uses: actions/upload-artifact@v7
