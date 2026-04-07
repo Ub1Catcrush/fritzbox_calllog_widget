@@ -140,13 +140,13 @@ jobs:
       - name: Upload APKs to Github Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: build-outputs
+          name: apk files
           path: app/build/outputs/apk/**/*.apk
 
       - name: Upload AABs to Github Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: build-outputs
+          name: aab files
           path: app/build/outputs/bundle/**/*.aab
 
       - name: Upload Debug APK to Release
