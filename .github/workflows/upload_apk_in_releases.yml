@@ -111,6 +111,7 @@ jobs:
       - name: Sign AAB with apksigner
         run: |
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+            --min-sdk-version 26
             --ks my-release-key.jks \
             --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
             --key-pass pass:${{ secrets.KEY_PASSWORD }} \
