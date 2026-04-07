@@ -1,11 +1,11 @@
 name: Build, Sign and Upload APK in Releases
 on:
-  push:
-    paths:
-      - 'dependencies.gradle'
-  pull_request:
-    paths:
-      - 'dependencies.gradle'
+#  push:
+#    paths:
+#      - 'dependencies.gradle'
+#  pull_request:
+#    paths:
+#      - 'dependencies.gradle'
   workflow_dispatch:
 
 #on:
