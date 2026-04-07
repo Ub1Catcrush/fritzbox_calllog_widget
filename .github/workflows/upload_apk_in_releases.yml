@@ -122,11 +122,15 @@ jobs:
             --v4-signing-enabled false \
             app/build/outputs/bundle/release/app-release-signed.aab
       
+# https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
       - name: Verify aligned APK signature
         run: |
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify \
-            --verbose \
-            app/build/outputs/apk/release/app-release-signed.apk
+          # Ermittelt die Browser-Download-URL der neuesten bundletool-all-*.jar
+          URL=$(curl -s https://api.github.com/repos/google/bundletool/releases/latest \
+            | jq -r '.assets[] | select(.name | test("bundletool-all-.*\\.jar")) | .browser_download_url')
+          curl -L "$URL" -o bundletool.jar
+          # Ausführung des Verifizierungs-Befehls
+          java -jar bundletool.jar check-bundle-signature --bundle=app/build/outputs/bundle/release/app-release-signed.aab
       
       - name: Verify aligned AAB signature
         run: |
