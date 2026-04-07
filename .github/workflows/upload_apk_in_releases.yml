@@ -87,13 +87,13 @@ jobs:
         run: |
           $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 \
             app/build/outputs/apk/release/app-release-unsigned.apk \
-            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release-signed.apk
             
       - name: Align AAB
         run: |
           $ANDROID_HOME/build-tools/34.0.0/zipalign -v 4 \
-            app/build/outputs/bundle/release/app-release-unsigned.aab \
-            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/bundle/release/app-release.aab \
+            app/build/outputs/bundle/release/app-release-signed.aab
 
       - name: Sign APK with apksigner
         run: |
@@ -106,7 +106,7 @@ jobs:
             --v2-signing-enabled true \
             --v3-signing-enabled true \
             --v4-signing-enabled false \
-            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release-signed.apk
             
       - name: Sign AAB with apksigner
         run: |
@@ -119,19 +119,19 @@ jobs:
             --v2-signing-enabled true \
             --v3-signing-enabled true \
             --v4-signing-enabled false \
-            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/bundle/release/app-release-signed.aab
       
       - name: Verify aligned APK signature
         run: |
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify \
             --verbose \
-            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release-signed.apk
       
       - name: Verify aligned AAB signature
         run: |
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify \
             --verbose \
-            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/bundle/release/app-release-signed.aab
 
       - name: Upload APKs to Github Artifacts
         uses: actions/upload-artifact@v7
@@ -161,8 +161,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: app/build/outputs/apk/release/app-release.apk
-          asset_name: app-release.apk
+          asset_path: app/build/outputs/apk/release/app-release-signed.apk
+          asset_name: app-release-signed.apk
           asset_content_type: application/vnd.android.package-archive
 
       - name: Upload Signed Release AAB to Release
@@ -171,6 +171,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: app/build/outputs/bundle/release/app-release.aab
-          asset_name: app-release.aab
+          asset_path: app/build/outputs/bundle/release/app-release-signed.aab
+          asset_name: app-release-signed.aab
           asset_content_type: application/vnd.android.package-archive
