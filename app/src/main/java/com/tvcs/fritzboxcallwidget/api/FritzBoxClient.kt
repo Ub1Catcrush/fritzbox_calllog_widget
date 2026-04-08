@@ -17,6 +17,7 @@ import javax.net.ssl.X509TrustManager
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 import org.w3c.dom.NodeList
+import java.io.IOException
 
 /**
  * FritzBox TR-064 SOAP API Client
@@ -46,7 +47,9 @@ class FritzBoxClient(
     private val httpClient: OkHttpClient by lazy {
         val builder = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+//            .callTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+//            .writeTimeout(10, TimeUnit.SECONDS)
 
         if (useHttps) {
             // Trust all certificates for local FritzBox (self-signed cert)
@@ -153,34 +156,47 @@ class FritzBoxClient(
             .header("Content-Type", "text/xml; charset=utf-8")
             .build()
 
-        var response = httpClient.newCall(request).execute()
+        try {
+            var response = httpClient.newCall(request).execute()
 
-        if (response.code == 401) {
-            val wwwAuth = response.header("WWW-Authenticate") ?: ""
-            response.close()
+            if (response.code == 401) {
+                val wwwAuth = response.header("WWW-Authenticate") ?: ""
+                response.close()
 
-            val authHeader = if (wwwAuth.startsWith("Digest", ignoreCase = true)) {
-                buildDigestAuthHeader(url, "POST", wwwAuth)
-            } else {
-                Credentials.basic(username, password)
+                val authHeader = if (wwwAuth.startsWith("Digest", ignoreCase = true)) {
+                    buildDigestAuthHeader(url, "POST", wwwAuth)
+                } else {
+                    Credentials.basic(username, password)
+                }
+
+                request = Request.Builder()
+                    .url(url)
+                    .post(body.toRequestBody(mediaType))
+                    .header("SOAPAction", soapAction)
+                    .header("Content-Type", "text/xml; charset=utf-8")
+                    .header("Authorization", authHeader)
+                    .build()
+
+                response = httpClient.newCall(request).execute()
             }
 
-            request = Request.Builder()
-                .url(url)
-                .post(body.toRequestBody(mediaType))
-                .header("SOAPAction", soapAction)
-                .header("Content-Type", "text/xml; charset=utf-8")
-                .header("Authorization", authHeader)
-                .build()
-
-            response = httpClient.newCall(request).execute()
+            val responseBody = response.body.string()
+            if (!response.isSuccessful)
+            {
+                throw FritzBoxException("SOAP error ${response.code}: $responseBody")
+            }
+            return responseBody;
+        } catch (e: java.net.ConnectException) {
+            throw FritzBoxException("Keine Verbindung zur FritzBox möglich: ${e.message}", e)
+        } catch (e: java.net.SocketTimeoutException) {
+            throw FritzBoxException("Zeitüberschreitung bei der Verbindung zur FritzBox", e)
+        } catch (e: java.net.UnknownHostException) {
+            throw FritzBoxException("FritzBox nicht erreichbar oder Hostname ungültig", e)
+        } catch (e: javax.net.ssl.SSLException) {
+            throw FritzBoxException("SSL-/Zertifikatsfehler bei der Verbindung zur FritzBox", e)
+        } catch (e: IOException) {
+            throw FritzBoxException("Netzwerkfehler bei der Kommunikation mit der FritzBox: ${e.message}", e)
         }
-
-        val responseBody = response.body.string()
-        if (!response.isSuccessful) {
-            throw FritzBoxException("SOAP error ${response.code}: $responseBody")
-        }
-        return responseBody
     }
 
     private fun buildDigestAuthHeader(url: String, method: String, wwwAuth: String): String {

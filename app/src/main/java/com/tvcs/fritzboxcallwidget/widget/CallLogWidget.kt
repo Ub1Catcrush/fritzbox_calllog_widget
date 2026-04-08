@@ -162,8 +162,7 @@ class CallLogWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.tv_error,       View.VISIBLE)
                 views.setViewVisibility(R.id.list_calls,     View.GONE)
                 views.setViewVisibility(R.id.tv_empty,       View.GONE)
-                views.setTextViewText(R.id.tv_error,
-                    ctx.getString(R.string.error_loading, state.message))
+                views.setTextViewText(R.id.tv_error, ctx.getString(R.string.error_loading, state.message))
                 views.setTextColor(R.id.tv_error, colors.error)
             }
 
