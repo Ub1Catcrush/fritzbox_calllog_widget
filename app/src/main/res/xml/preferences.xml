@@ -9,11 +9,78 @@
 
     <!-- Connection -->
     <PreferenceCategory android:title="@string/pref_category_connection" app:iconSpaceReserved="false">
-        <EditTextPreference android:key="pref_host"     android:title="@string/pref_host_title"     android:summary="@string/pref_host_summary"     android:defaultValue="fritz.box" android:inputType="text"         app:iconSpaceReserved="false"/>
-        <EditTextPreference android:key="pref_port"     android:title="@string/pref_port_title"     android:summary="@string/pref_port_summary"     android:defaultValue="49000"    android:inputType="number"       app:iconSpaceReserved="false"/>
-        <EditTextPreference android:key="pref_username" android:title="@string/pref_username_title" android:summary="@string/pref_username_summary" android:defaultValue=""         android:inputType="text"         app:iconSpaceReserved="false"/>
-        <EditTextPreference android:key="pref_password" android:title="@string/pref_password_title" android:summary="@string/pref_password_summary" android:defaultValue=""         android:inputType="textPassword" app:iconSpaceReserved="false"/>
-        <SwitchPreferenceCompat android:key="pref_https" android:title="@string/pref_https_title" android:summary="@string/pref_https_summary" android:defaultValue="false" app:iconSpaceReserved="false"/>
+        <!-- LAN address (home network) -->
+        <EditTextPreference
+            android:key="pref_lan_host"
+            android:title="@string/pref_lan_host_title"
+            android:summary="@string/pref_lan_host_summary"
+            android:defaultValue="fritz.box"
+            android:inputType="text"
+            app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+            android:key="pref_lan_port"
+            android:title="@string/pref_lan_port_title"
+            android:summary="@string/pref_lan_port_summary"
+            android:defaultValue="49000"
+            android:inputType="number"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Internet / MyFRITZ address -->
+        <EditTextPreference
+            android:key="pref_internet_host"
+            android:title="@string/pref_internet_host_title"
+            android:summary="@string/pref_internet_host_summary"
+            android:defaultValue=""
+            android:inputType="text"
+            app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+            android:key="pref_internet_port"
+            android:title="@string/pref_internet_port_title"
+            android:summary="@string/pref_internet_port_summary"
+            android:defaultValue="49000"
+            android:inputType="number"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Credentials -->
+        <EditTextPreference
+            android:key="pref_username"
+            android:title="@string/pref_username_title"
+            android:summary="@string/pref_username_summary"
+            android:defaultValue=""
+            android:inputType="text"
+            app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+            android:key="pref_password"
+            android:title="@string/pref_password_title"
+            android:summary="@string/pref_password_summary"
+            android:defaultValue=""
+            android:inputType="textPassword"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Connection options -->
+        <SwitchPreferenceCompat
+            android:key="pref_https"
+            android:title="@string/pref_https_title"
+            android:summary="@string/pref_https_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+        <SwitchPreferenceCompat
+            android:key="pref_myfritz"
+            android:title="@string/pref_myfritz_title"
+            android:summary="@string/pref_myfritz_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+        <SwitchPreferenceCompat
+            android:key="pref_lan_first_fallback"
+            android:title="@string/pref_lan_fallback_title"
+            android:summary="@string/pref_lan_fallback_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false"/>
     </PreferenceCategory>
 
     <!-- Refresh / Data -->

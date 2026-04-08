@@ -114,10 +114,18 @@ class SettingsActivity : AppCompatActivity() {
 
             // Data / connection
             listOf(
-                AppPreferences.KEY_HOST, AppPreferences.KEY_PORT,
-                AppPreferences.KEY_USERNAME, AppPreferences.KEY_PASSWORD,
-                AppPreferences.KEY_HTTPS, AppPreferences.KEY_PHONE_PREFIX,
-                AppPreferences.KEY_REFRESH, AppPreferences.KEY_MAX_ENTRIES
+                AppPreferences.KEY_LAN_HOST,
+                AppPreferences.KEY_LAN_PORT,
+                AppPreferences.KEY_LAN_FIRST_FALLBACK,
+                AppPreferences.KEY_INTERNET_HOST,
+                AppPreferences.KEY_INTERNET_PORT,
+                AppPreferences.KEY_USERNAME,
+                AppPreferences.KEY_PASSWORD,
+                AppPreferences.KEY_HTTPS,
+                AppPreferences.KEY_MYFRITZ,
+                AppPreferences.KEY_PHONE_PREFIX,
+                AppPreferences.KEY_REFRESH,
+                AppPreferences.KEY_MAX_ENTRIES
             ).forEach { key ->
                 findPreference<Preference>(key)
                     ?.setOnPreferenceChangeListener { _, _ -> scheduleWidgetRefresh(); true }
