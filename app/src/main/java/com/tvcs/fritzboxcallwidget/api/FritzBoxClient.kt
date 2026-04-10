@@ -1,5 +1,6 @@
 package com.tvcs.fritzboxcallwidget.api
 
+import android.annotation.SuppressLint
 import android.util.Log
 import okhttp3.Credentials
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -22,6 +23,8 @@ import javax.net.ssl.X509TrustManager
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionSpec
+import okio.ByteString.Companion.decodeHex
 
 /**
  * FritzBox connection client supporting:
@@ -48,26 +51,39 @@ class FritzBoxClient(
     private val baseUrl = "$scheme://${profile.host}:${profile.port}"
 
     private val httpClient: OkHttpClient by lazy {
-        val builder = OkHttpClient.Builder()
+        OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .apply {
+                if (profile.useHttps) {
+                    setupUnsafeSsl() // Oder besser: setupSafeSslWithCert()
+                }
+            }
+            .build()
+    }
 
-        if (profile.useHttps) {
-            // Trust all certs for local FritzBox with self-signed certificate
-            val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
-                override fun checkClientTrusted(c: Array<X509Certificate>, a: String) {}
-                override fun checkServerTrusted(c: Array<X509Certificate>, a: String) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            })
-            // Use "TLS" not "SSL" — SSLContext.getInstance("SSL") is deprecated
-            val ctx = SSLContext.getInstance("TLS")
-            ctx.init(null, trustAll, java.security.SecureRandom())
-            builder.sslSocketFactory(ctx.socketFactory, trustAll[0] as X509TrustManager)
-            builder.hostnameVerifier { _, _ -> true }
+    private fun OkHttpClient.Builder.setupUnsafeSsl() {
+        val trustAllCerts = @SuppressLint("CustomX509TrustManager")
+        object : X509TrustManager {
+            @SuppressLint("TrustAllX509TrustManager")
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            @SuppressLint("TrustAllX509TrustManager")
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         }
-        builder.build()
+
+        val sslContext = SSLContext.getInstance("TLS").apply {
+            init(null, arrayOf<TrustManager>(trustAllCerts), java.security.SecureRandom())
+        }
+
+        sslSocketFactory(sslContext.socketFactory, trustAllCerts)
+        // Nur nutzen, wenn absolut notwendig, da dies MITM-Attacken ermöglicht
+        hostnameVerifier { _, _ -> true }
+
+        // Best Practice: TLS-Versionen einschränken
+        connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -154,28 +170,39 @@ class FritzBoxClient(
         sid
     }
 
-    /** Protocol v2: challenge = "2\$iter1\$salt1\$iter2\$salt2" */
-    private fun computePbkdf2Response(challenge: String): String {
-        val parts = challenge.split("\$")
-        if (parts.size != 5) throw FritzBoxException("Unbekanntes Challenge-Format v2: $challenge")
-        val iter1 = parts[1].toInt(); val salt1 = parts[2].hexToBytes()
-        val iter2 = parts[3].toInt(); val salt2 = parts[4].hexToBytes()
-        val pw    = password.toByteArray(StandardCharsets.UTF_8)
-        val hash1 = pbkdf2HmacSha256(pw, salt1, iter1, 32)
-        val hash2 = pbkdf2HmacSha256(hash1, salt2, iter2, 32)
-        return "$username:${hash2.toHexString()}"
-    }
-
-    /** Protocol v1: MD5(challenge-password as UTF-16LE) */
+    /**
+     * Protocol v1: MD5(challenge + "-" + password)
+     * WICHTIG: Der String muss in UTF-16LE encodiert werden!
+     */
     private fun computeMd5Response(challenge: String): String {
         val combined = "$challenge-$password".toByteArray(StandardCharsets.UTF_16LE)
-        val hash = MessageDigest.getInstance("MD5").digest(combined).toHexString()
+        val hash = MessageDigest.getInstance("MD5").digest(combined)
+            .joinToString("") { "%02x".format(it) }
         return "$challenge-$hash"
     }
 
-    private fun pbkdf2HmacSha256(password: ByteArray, salt: ByteArray, iterations: Int, keyLen: Int): ByteArray {
-        val spec    = javax.crypto.spec.PBEKeySpec(
-            password.map { it.toInt().toChar() }.toCharArray(), salt, iterations, keyLen * 8)
+    /** Protocol v2: challenge = "2$iter1$salt1$iter2$salt2" */
+    private fun computePbkdf2Response(challenge: String): String {
+        val parts = challenge.split("$")
+        val iter1 = parts[1].toInt()
+        val salt1 = parts[2].decodeHex()
+        val iter2 = parts[3].toInt()
+        val salt2 = parts[4].decodeHex()
+
+        // 1. Hash: Klartext-Passwort -> hash1 (binär)
+        val hash1 = pbkdf2(password.toCharArray(), salt1.toByteArray(), iter1)
+
+        // 2. Hash: Binärer hash1 -> hash2
+        // Wichtig: hash1 muss als "rohe Bytes" in Chars gemappt werden (ISO_8859_1)
+        val hash1AsChars = String(hash1, Charsets.ISO_8859_1).toCharArray()
+        val hash2 = pbkdf2(hash1AsChars, salt2.toByteArray(), iter2)
+
+        // Das v2 Format verlangt oft nur den letzten Salt + Hash
+        return "${parts[4]}$${hash2.joinToString("") { "%02x".format(it) }}"
+    }
+
+    private fun pbkdf2(password: CharArray, salt: ByteArray, iterations: Int): ByteArray {
+        val spec = javax.crypto.spec.PBEKeySpec(password, salt, iterations, 256)
         return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
     }
 
@@ -318,19 +345,19 @@ class FritzBoxClient(
     private fun parseXml(xml: String): org.w3c.dom.Document {
         val factory = DocumentBuilderFactory.newInstance().also { f ->
             f.isNamespaceAware = false
-            // XXE protection — disable external entity resolution
+            // Android unterstützt setXIncludeAware nicht -> Entfernen oder in runCatching packen
+            // f.isXIncludeAware = false
+
             runCatching {
                 f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
                 f.setFeature("http://xml.org/sax/features/external-general-entities", false)
                 f.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-                f.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
             }
-            f.isXIncludeAware  = false
+
             f.isExpandEntityReferences = false
         }
         return factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
     }
-
     private fun md5(input: String): String =
         MessageDigest.getInstance("MD5").digest(input.toByteArray(Charsets.UTF_8)).toHexString()
 

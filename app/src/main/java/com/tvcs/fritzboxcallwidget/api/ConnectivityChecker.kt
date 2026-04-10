@@ -4,6 +4,9 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.xml.sax.InputSource
@@ -261,12 +264,13 @@ object ConnectivityChecker {
                 computeMd5Response(challenge, password)
 
             val authUrl = "$baseUrl/login_sid.lua?version=2"
-                .toHttpUrl3().newBuilder()
-                .addQueryParameter("username", username)
-                .addQueryParameter("response", response)
-                .build()
+                .toHttpUrl()?.newBuilder() // Safe Call hier
+                ?.addQueryParameter("username", username)
+                ?.addQueryParameter("response", response)
+                ?.build() ?: throw Exception("Ungültige Auth-URL") // Fallback, falls URL-Parsing fehlschlägt
 
             val authXml = runCatching {
+                // Hier ist authUrl jetzt garantiert nicht null
                 client.newCall(Request.Builder().url(authUrl).build())
                     .execute().use { r -> r.body?.string() ?: "" }
             }.getOrElse { e -> fail(labelSid, e.message ?: "Fehler"); return }
@@ -283,8 +287,8 @@ object ConnectivityChecker {
         // Step 6: Call list CSV
         val labelList = "Anrufliste abrufen (CSV)"
         running(labelList)
-        val csvUrl = "$baseUrl/fon_num/foncalls_list.lua"
-            .toHttpUrl3().newBuilder()
+        val csvUrl = "$baseUrl/fon_num/foncalls_list.lua?version=2"
+            .toHttpUrl().newBuilder()
             .addQueryParameter("sid", sid)
             .addQueryParameter("csv", "")
             .build()
@@ -359,8 +363,8 @@ object ConnectivityChecker {
         client: OkHttpClient, url: String, soapAction: String, body: String,
         username: String, password: String
     ): String {
-        val mt  = okhttp3.MediaType.Companion.toMediaType("text/xml; charset=utf-8")
-        val rb  = okhttp3.RequestBody.Companion.toRequestBody(body, mt)
+        val mt  = "text/xml; charset=utf-8".toMediaType()
+        val rb  = body.toRequestBody(mt)
         var req = Request.Builder().url(url).post(rb)
             .header("SOAPAction", soapAction)
             .header("Content-Type", "text/xml; charset=utf-8")
@@ -370,7 +374,7 @@ object ConnectivityChecker {
             val wwwAuth = resp.header("WWW-Authenticate") ?: ""
             resp.close()
             req = Request.Builder().url(url)
-                .post(okhttp3.RequestBody.Companion.toRequestBody(body, mt))
+                .post(body.toRequestBody(mt))
                 .header("SOAPAction", soapAction)
                 .header("Content-Type", "text/xml; charset=utf-8")
                 .header("Authorization", buildDigestHeader(url, "POST", wwwAuth, username, password))
@@ -411,12 +415,15 @@ object ConnectivityChecker {
     private fun parseXml(xml: String): org.w3c.dom.Document {
         val factory = DocumentBuilderFactory.newInstance().also { f ->
             f.isNamespaceAware = false
+            // Android unterstützt setXIncludeAware nicht -> Entfernen oder in runCatching packen
+            // f.isXIncludeAware = false
+
             runCatching {
                 f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
                 f.setFeature("http://xml.org/sax/features/external-general-entities", false)
                 f.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
             }
-            f.isXIncludeAware = false
+
             f.isExpandEntityReferences = false
         }
         return factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
@@ -425,5 +432,4 @@ object ConnectivityChecker {
     private fun md5(input: String) =
         MessageDigest.getInstance("MD5").digest(input.toByteArray(Charsets.UTF_8)).toHexString()
 
-    private fun String.toHttpUrl3() = okhttp3.HttpUrl.Companion.toHttpUrl(this)
 }
