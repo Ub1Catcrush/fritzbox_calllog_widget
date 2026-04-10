@@ -87,4 +87,19 @@
     <string name="colors_reset">Colors reset to theme defaults.</string>
     <string name="pref_category_colors_light">Light Mode Colors</string>
     <string name="pref_category_colors_dark">Dark Mode Colors</string>
+    <string name="pref_connections_title">Connection Priority</string>
+    <string name="pref_connections_summary">Configure and prioritise LAN TR-064, Internet TR-064 and MyFRITZ connections</string>
+    <string name="profile_order_hint">Drag to reorder. The app tries connections from top to bottom. Disable options you don\'t need.</string>
+    <string name="profile_min_one_required">At least one connection must remain enabled.</string>
+    <string name="not_configured">Not configured</string>
+    <string name="drag_to_reorder">Drag to reorder</string>
+    <string name="edit_profile">Edit connection</string>
+    <string name="test_connection">Test connection</string>
+    <string name="myfritz_port_hint">MyFRITZ typically uses port 80 (HTTP) or 443 (HTTPS), not 49000.</string>
+    <string name="pref_host_title">Address</string>
+    <string name="pref_port_title">Port</string>
+    <string name="checking_connection">Checking: %s</string>
+    <string name="check_result_ok">All checks passed.</string>
+    <string name="check_result_failed">%d check(s) failed.</string>
+    <string name="check_result_warning">%d warning(s).</string>
 </resources>

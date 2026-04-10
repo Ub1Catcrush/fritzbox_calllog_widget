@@ -77,4 +77,19 @@
     <string name="colors_reset">Couleurs réinitialisées.</string>
     <string name="pref_category_colors_light">Couleurs mode clair</string>
     <string name="pref_category_colors_dark">Couleurs mode sombre</string>
+    <string name="pref_connections_title">Priorité de connexion</string>
+    <string name="pref_connections_summary">Configurer et prioriser les connexions LAN TR-064, Internet TR-064 et MyFRITZ</string>
+    <string name="profile_order_hint">Faites glisser pour réordonner. L\'application essaie les connexions de haut en bas.</string>
+    <string name="profile_min_one_required">Au moins une connexion doit rester active.</string>
+    <string name="not_configured">Non configuré</string>
+    <string name="drag_to_reorder">Glisser pour réordonner</string>
+    <string name="edit_profile">Modifier la connexion</string>
+    <string name="test_connection">Tester la connexion</string>
+    <string name="myfritz_port_hint">MyFRITZ utilise généralement le port 80 (HTTP) ou 443 (HTTPS), pas 49000.</string>
+    <string name="pref_host_title">Adresse</string>
+    <string name="pref_port_title">Port</string>
+    <string name="checking_connection">Vérification : %s</string>
+    <string name="check_result_ok">Tous les tests réussis.</string>
+    <string name="check_result_failed">%d test(s) échoué(s).</string>
+    <string name="check_result_warning">%d avertissement(s).</string>
 </resources>

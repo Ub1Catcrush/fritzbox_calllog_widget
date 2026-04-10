@@ -20,70 +20,74 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 import javax.xml.parsers.DocumentBuilderFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * FritzBox TR-064 SOAP API Client + MyFRITZ Session API Client.
+ * FritzBox connection client supporting:
+ *   - TR-064 SOAP with HTTP Digest Auth  (LAN and Internet)
+ *   - MyFRITZ Session API v2 (PBKDF2) with v1 (MD5) fallback
  *
- * Handles two connection modes:
- *   - TR-064 SOAP (default): port 49000/49443, Digest Auth
- *   - MyFRITZ Session API:   port 80/443, Challenge-Response MD5 Auth, CSV export
- *
- * Both modes include:
- *   - Longer timeouts suitable for remote (internet) access
- *   - retryOnConnectionFailure for transient network errors
- *   - Structured exception hierarchy for meaningful error messages
+ * All network I/O is dispatched on Dispatchers.IO via withContext.
+ * Timeouts are set generously for internet access.
  */
 class FritzBoxClient(
-    private val host: String,
-    private val port: Int = 49000,
+    private val profile: ConnectionProfile,
     private val username: String,
-    private val password: String,
-    private val useHttps: Boolean = false,
-    private val useMyFritz: Boolean = false
+    private val password: String
 ) {
     companion object {
-        private const val TAG = "FritzBoxClient"
-        private const val ONTEL_SERVICE    = "urn:dslforum-org:service:X_AVM-DE_OnTel:1"
-        private const val ONTEL_CONTROL_URL = "/upnp/control/x_contact"
+        private const val TAG                       = "FritzBoxClient"
+        private const val ONTEL_SERVICE             = "urn:dslforum-org:service:X_AVM-DE_OnTel:1"
+        private const val ONTEL_CONTROL_URL         = "/upnp/control/x_contact"
         private const val SOAP_ACTION_GET_CALL_LIST = "GetCallList"
-        private const val CALL_LIST_MAX_DAYS = 30
+        private const val CALL_LIST_MAX_DAYS        = 30
     }
 
-    private val scheme  = if (useHttps) "https" else "http"
-    private val baseUrl = "$scheme://$host:$port"
+    private val scheme  = if (profile.useHttps) "https" else "http"
+    private val baseUrl = "$scheme://${profile.host}:${profile.port}"
 
     private val httpClient: OkHttpClient by lazy {
         val builder = OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)   // increased for internet access
-            .readTimeout(30, TimeUnit.SECONDS)       // increased for slow connections
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)          // auto-retry on transient failures
+            .retryOnConnectionFailure(true)
 
-        if (useHttps) {
-            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+        if (profile.useHttps) {
+            // Trust all certs for local FritzBox with self-signed certificate
+            val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
                 override fun checkClientTrusted(c: Array<X509Certificate>, a: String) {}
                 override fun checkServerTrusted(c: Array<X509Certificate>, a: String) {}
                 override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
             })
-            val sslContext = SSLContext.getInstance("SSL")
-            sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-            builder.sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            // Use "TLS" not "SSL" — SSLContext.getInstance("SSL") is deprecated
+            val ctx = SSLContext.getInstance("TLS")
+            ctx.init(null, trustAll, java.security.SecureRandom())
+            builder.sslSocketFactory(ctx.socketFactory, trustAll[0] as X509TrustManager)
             builder.hostnameVerifier { _, _ -> true }
         }
         builder.build()
     }
 
-    // ── Public entry point ────────────────────────────────────────────────────
+    // ── Public API ────────────────────────────────────────────────────────────
 
+    /**
+     * Fetches the call list. Dispatches all blocking I/O on Dispatchers.IO
+     * so it is safe to call from any coroutine context.
+     */
     @Throws(FritzBoxException::class)
-    suspend fun getCallList(): List<FritzCallEntry> =
-        if (useMyFritz) getCallListByMyFritz() else getCallListByTR064()
+    suspend fun getCallList(): List<FritzCallEntry> = withContext(Dispatchers.IO) {
+        when (profile.type) {
+            ConnectionType.INTERNET_MYFRITZ -> getCallListMyFritz()
+            else                            -> getCallListTR064()
+        }
+    }
 
-    // ── MyFRITZ (Session-ID + CSV) ────────────────────────────────────────────
+    // ── MyFRITZ (Session API) ─────────────────────────────────────────────────
 
-    @Throws(FritzBoxException::class)
-    suspend fun getCallListByMyFritz(): List<FritzCallEntry> {
-        val sid = getSid()
+    private fun getCallListMyFritz(): List<FritzCallEntry> {
+        val sid = loginMyFritz()
 
         val url = baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("fon_num/foncalls_list.lua")
@@ -91,161 +95,135 @@ class FritzBoxClient(
             .addQueryParameter("csv", "")
             .build()
 
-        val request = Request.Builder().url(url).build()
-
-        return try {
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw FritzBoxException(
-                        "HTTP ${response.code} beim Abruf der Anrufliste (MyFRITZ)"
-                    )
-                }
+        return wrapIo("MyFRITZ call list fetch") {
+            httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                if (!response.isSuccessful)
+                    throw FritzBoxException("HTTP ${response.code} beim Abruf der Anrufliste (MyFRITZ)")
                 val body = response.body?.string()
-                    ?: throw FritzBoxException("Leere Antwort beim Abruf der Anrufliste (MyFRITZ)")
+                    ?: throw FritzBoxException("Leere Antwort bei Anrufliste (MyFRITZ)")
                 parseCallListCsv(body)
             }
-        } catch (e: FritzBoxException) {
-            throw e
-        } catch (e: java.net.ConnectException) {
-            throw FritzBoxException("Keine Verbindung zur FritzBox möglich (MyFRITZ): ${e.message}", e)
-        } catch (e: java.net.SocketTimeoutException) {
-            throw FritzBoxException("Zeitüberschreitung (MyFRITZ) — Verbindung zu $host:$port", e)
-        } catch (e: java.net.UnknownHostException) {
-            throw FritzBoxException("Host nicht gefunden: $host", e)
-        } catch (e: javax.net.ssl.SSLException) {
-            throw FritzBoxException("SSL-Fehler (MyFRITZ): ${e.message}", e)
-        } catch (e: IOException) {
-            throw FritzBoxException("Netzwerkfehler (MyFRITZ): ${e.message}", e)
         }
     }
 
-    private fun getSid(): String {
-        try {
-            // 1. Challenge holen
-            val loginUrl = "$baseUrl/login_sid.lua"
-            val xml = httpClient.newCall(
-                Request.Builder().url(loginUrl).build()
-            ).execute().use {
-                it.body?.string()
-                    ?: throw FritzBoxException("Keine Antwort auf Login-Challenge von $host")
-            }
+    /**
+     * MyFRITZ login. Tries Protocol v2 (PBKDF2-SHA256) first, falls back to v1 (MD5).
+     * v2 reference: https://avm.de/service/schnittstellen/
+     */
+    private fun loginMyFritz(): String = wrapIo("MyFRITZ login") {
+        val loginUrl = "$baseUrl/login_sid.lua?version=2"
 
-            val challenge   = xml.substringAfter("<Challenge>").substringBefore("</Challenge>")
-            val currentSid  = xml.substringAfter("<SID>").substringBefore("</SID>")
-
-            if (currentSid != "0000000000000000") return currentSid
-
-            if (challenge.isBlank()) {
-                throw FritzBoxException("Ungültige Login-Challenge von $host — evtl. falscher Port oder Protokoll")
-            }
-
-            // 2. Response berechnen (UTF-16LE Challenge-Password MD5)
-            val combined = "$challenge-$password".toByteArray(StandardCharsets.UTF_16LE)
-            val hash     = MessageDigest.getInstance("MD5").digest(combined)
-                .joinToString("") { "%02x".format(it) }
-            val response = "$challenge-$hash"
-
-            // 3. Login durchführen
-            val authUrl = loginUrl.toHttpUrl().newBuilder()
-                .addQueryParameter("username", username)
-                .addQueryParameter("response", response)
-                .build()
-
-            val authXml = httpClient.newCall(
-                Request.Builder().url(authUrl).build()
-            ).execute().use {
-                it.body?.string()
-                    ?: throw FritzBoxException("Keine Antwort auf Login-Request von $host")
-            }
-
-            val sid = authXml.substringAfter("<SID>").substringBefore("</SID>")
-            if (sid == "0000000000000000" || sid.isBlank()) {
-                throw FritzBoxException("Anmeldung fehlgeschlagen — Benutzername oder Passwort falsch")
-            }
-            return sid
-
-        } catch (e: FritzBoxException) {
-            throw e
-        } catch (e: java.net.ConnectException) {
-            throw FritzBoxException("Keine Verbindung zur FritzBox möglich (Login): ${e.message}", e)
-        } catch (e: java.net.SocketTimeoutException) {
-            throw FritzBoxException("Zeitüberschreitung beim Login — Verbindung zu $host:$port", e)
-        } catch (e: java.net.UnknownHostException) {
-            throw FritzBoxException("Host nicht gefunden beim Login: $host", e)
-        } catch (e: javax.net.ssl.SSLException) {
-            throw FritzBoxException("SSL-Fehler beim Login: ${e.message}", e)
-        } catch (e: IOException) {
-            throw FritzBoxException("Netzwerkfehler beim Login: ${e.message}", e)
+        val challengeXml = httpClient.newCall(
+            Request.Builder().url(loginUrl).build()
+        ).execute().use { r ->
+            if (!r.isSuccessful)
+                throw FritzBoxException("HTTP ${r.code} beim Login-Challenge-Request")
+            r.body?.string() ?: throw FritzBoxException("Leere Challenge-Antwort von ${profile.host}")
         }
+
+        val currentSid = challengeXml.extractXmlTag("SID")
+        if (currentSid != "0000000000000000") return@wrapIo currentSid
+
+        val challenge = challengeXml.extractXmlTag("Challenge")
+        if (challenge.isBlank())
+            throw FritzBoxException("Ungültige Login-Challenge — falscher Port oder Protokoll?")
+
+        val response = if (challenge.startsWith("2\$"))
+            computePbkdf2Response(challenge)
+        else
+            computeMd5Response(challenge)
+
+        val authUrl = loginUrl.toHttpUrl().newBuilder()
+            .addQueryParameter("username", username)
+            .addQueryParameter("response", response)
+            .build()
+
+        val authXml = httpClient.newCall(
+            Request.Builder().url(authUrl).build()
+        ).execute().use { r ->
+            if (!r.isSuccessful)
+                throw FritzBoxException("HTTP ${r.code} bei Login-Authentifizierung")
+            r.body?.string() ?: throw FritzBoxException("Leere Auth-Antwort von ${profile.host}")
+        }
+
+        val sid = authXml.extractXmlTag("SID")
+        if (sid == "0000000000000000" || sid.isBlank())
+            throw FritzBoxException("Anmeldung fehlgeschlagen — Benutzername oder Passwort falsch")
+
+        Log.d(TAG, "MyFRITZ login OK (${if (challenge.startsWith("2\$")) "v2/PBKDF2" else "v1/MD5"})")
+        sid
+    }
+
+    /** Protocol v2: challenge = "2\$iter1\$salt1\$iter2\$salt2" */
+    private fun computePbkdf2Response(challenge: String): String {
+        val parts = challenge.split("\$")
+        if (parts.size != 5) throw FritzBoxException("Unbekanntes Challenge-Format v2: $challenge")
+        val iter1 = parts[1].toInt(); val salt1 = parts[2].hexToBytes()
+        val iter2 = parts[3].toInt(); val salt2 = parts[4].hexToBytes()
+        val pw    = password.toByteArray(StandardCharsets.UTF_8)
+        val hash1 = pbkdf2HmacSha256(pw, salt1, iter1, 32)
+        val hash2 = pbkdf2HmacSha256(hash1, salt2, iter2, 32)
+        return "$username:${hash2.toHexString()}"
+    }
+
+    /** Protocol v1: MD5(challenge-password as UTF-16LE) */
+    private fun computeMd5Response(challenge: String): String {
+        val combined = "$challenge-$password".toByteArray(StandardCharsets.UTF_16LE)
+        val hash = MessageDigest.getInstance("MD5").digest(combined).toHexString()
+        return "$challenge-$hash"
+    }
+
+    private fun pbkdf2HmacSha256(password: ByteArray, salt: ByteArray, iterations: Int, keyLen: Int): ByteArray {
+        val spec    = javax.crypto.spec.PBEKeySpec(
+            password.map { it.toInt().toChar() }.toCharArray(), salt, iterations, keyLen * 8)
+        return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
     }
 
     // ── TR-064 SOAP ───────────────────────────────────────────────────────────
 
-    @Throws(FritzBoxException::class)
-    suspend fun getCallListByTR064(): List<FritzCallEntry> {
-        val callListUrl = fetchCallListUrl()
-        Log.d(TAG, "Call list URL: $callListUrl")
-        return downloadAndParseCallList(callListUrl)
-    }
-
-    private fun fetchCallListUrl(): String {
-        val soapBody = buildSoapEnvelope(
-            serviceType = ONTEL_SERVICE,
-            actionName  = SOAP_ACTION_GET_CALL_LIST,
-            arguments   = mapOf("NewMaxDays" to CALL_LIST_MAX_DAYS.toString())
-        )
-        val url        = "$baseUrl$ONTEL_CONTROL_URL"
-        val soapAction = "\"$ONTEL_SERVICE#$SOAP_ACTION_GET_CALL_LIST\""
+    private fun getCallListTR064(): List<FritzCallEntry> {
+        val soapBody    = buildSoapEnvelope(ONTEL_SERVICE, SOAP_ACTION_GET_CALL_LIST,
+                              mapOf("NewMaxDays" to CALL_LIST_MAX_DAYS.toString()))
+        val url         = "$baseUrl$ONTEL_CONTROL_URL"
+        val soapAction  = "\"$ONTEL_SERVICE#$SOAP_ACTION_GET_CALL_LIST\""
         val responseXml = performAuthenticatedSoapRequest(url, soapAction, soapBody)
 
         val doc      = parseXml(responseXml)
         val urlNodes: NodeList = doc.getElementsByTagName("NewCallListURL")
-        if (urlNodes.length == 0) throw FritzBoxException("Keine NewCallListURL in TR-064-Antwort")
-        return urlNodes.item(0).textContent.trim()
-    }
+        if (urlNodes.length == 0)
+            throw FritzBoxException("Keine NewCallListURL in TR-064-Antwort")
+        val callListUrl = urlNodes.item(0).textContent.trim()
 
-    private fun downloadAndParseCallList(callListUrl: String): List<FritzCallEntry> {
-        val request = Request.Builder().url(callListUrl).build()
-        return try {
-            httpClient.newCall(request).execute().use { response ->
-                val body = response.body?.string()
-                    ?: throw FritzBoxException("Leere Antwort beim Abruf der Anrufliste (TR-064)")
-                if (!response.isSuccessful) {
-                    throw FritzBoxException("HTTP ${response.code} beim Abruf der Anrufliste")
-                }
+        return wrapIo("TR-064 call list download") {
+            httpClient.newCall(Request.Builder().url(callListUrl).build()).execute().use { r ->
+                val body = r.body?.string()
+                    ?: throw FritzBoxException("Leere Antwort beim Abruf der Anrufliste")
+                if (!r.isSuccessful) throw FritzBoxException("HTTP ${r.code} beim Abruf der Anrufliste")
                 parseCallListXml(body)
             }
-        } catch (e: FritzBoxException) {
-            throw e
-        } catch (e: IOException) {
-            throw FritzBoxException("Netzwerkfehler beim Abruf der Anrufliste: ${e.message}", e)
         }
     }
 
-    private fun performAuthenticatedSoapRequest(
-        url: String, soapAction: String, body: String
-    ): String {
+    private fun performAuthenticatedSoapRequest(url: String, soapAction: String, body: String): String {
         val mediaType   = "text/xml; charset=utf-8".toMediaType()
         val requestBody = body.toRequestBody(mediaType)
 
-        var request = Request.Builder()
-            .url(url).post(requestBody)
-            .header("SOAPAction", soapAction)
-            .header("Content-Type", "text/xml; charset=utf-8")
-            .build()
+        return wrapIo("TR-064 SOAP request") {
+            var request = Request.Builder()
+                .url(url).post(requestBody)
+                .header("SOAPAction", soapAction)
+                .header("Content-Type", "text/xml; charset=utf-8")
+                .build()
 
-        try {
             var response = httpClient.newCall(request).execute()
 
             if (response.code == 401) {
                 val wwwAuth = response.header("WWW-Authenticate") ?: ""
                 response.close()
-
-                val authHeader = if (wwwAuth.startsWith("Digest", ignoreCase = true)) {
+                val authHeader = if (wwwAuth.startsWith("Digest", ignoreCase = true))
                     buildDigestAuthHeader(url, "POST", wwwAuth)
-                } else {
+                else
                     Credentials.basic(username, password)
-                }
 
                 request = Request.Builder()
                     .url(url).post(body.toRequestBody(mediaType))
@@ -253,52 +231,32 @@ class FritzBoxClient(
                     .header("Content-Type", "text/xml; charset=utf-8")
                     .header("Authorization", authHeader)
                     .build()
-
                 response = httpClient.newCall(request).execute()
             }
 
             val responseBody = response.body?.string()
-                ?: throw FritzBoxException("Leere SOAP-Antwort von $host")
-            if (!response.isSuccessful) {
+                ?: throw FritzBoxException("Leere SOAP-Antwort von ${profile.host}")
+            if (!response.isSuccessful)
                 throw FritzBoxException("SOAP-Fehler ${response.code}: $responseBody")
-            }
-            return responseBody
-
-        } catch (e: FritzBoxException) {
-            throw e
-        } catch (e: java.net.ConnectException) {
-            throw FritzBoxException("Keine Verbindung zur FritzBox möglich: ${e.message}", e)
-        } catch (e: java.net.SocketTimeoutException) {
-            throw FritzBoxException("Zeitüberschreitung — Verbindung zu $host:$port", e)
-        } catch (e: java.net.UnknownHostException) {
-            throw FritzBoxException("Host nicht gefunden: $host", e)
-        } catch (e: javax.net.ssl.SSLException) {
-            throw FritzBoxException("SSL-/Zertifikatsfehler: ${e.message}", e)
-        } catch (e: IOException) {
-            throw FritzBoxException("Netzwerkfehler: ${e.message}", e)
+            responseBody
         }
     }
 
     // ── Parsers ───────────────────────────────────────────────────────────────
 
-    private fun parseCallListCsv(csv: String): List<FritzCallEntry> {
-        val lines = csv.lines()
-        if (lines.size < 2) return emptyList()
-        return lines.drop(1)
-            .filter { it.isNotBlank() }
-            .mapNotNull { line ->
-                val c = line.split(";")
-                if (c.size < 6) return@mapNotNull null
-                FritzCallEntry(
-                    type     = c.getOrNull(0)?.trim()?.toIntOrNull() ?: 0,
-                    date     = c.getOrNull(1)?.trim() ?: "",
-                    name     = c.getOrNull(2)?.trim() ?: "",
-                    caller   = c.getOrNull(3)?.trim() ?: "",
-                    called   = c.getOrNull(5)?.trim() ?: "",
-                    duration = c.getOrNull(6)?.trim() ?: ""
-                )
-            }
-    }
+    private fun parseCallListCsv(csv: String): List<FritzCallEntry> =
+        csv.lines().drop(1).filter { it.isNotBlank() }.mapNotNull { line ->
+            val c = line.split(";")
+            if (c.size < 6) null
+            else FritzCallEntry(
+                type     = c.getOrNull(0)?.trim()?.toIntOrNull() ?: 0,
+                date     = c.getOrNull(1)?.trim() ?: "",
+                name     = c.getOrNull(2)?.trim() ?: "",
+                caller   = c.getOrNull(3)?.trim() ?: "",
+                called   = c.getOrNull(5)?.trim() ?: "",
+                duration = c.getOrNull(6)?.trim() ?: ""
+            )
+        }
 
     private fun parseCallListXml(xml: String): List<FritzCallEntry> {
         val doc   = parseXml(xml)
@@ -330,7 +288,6 @@ class FritzBoxClient(
         val cnonce = System.currentTimeMillis().toString(16)
         val resp   = if (qop == "auth") md5("$ha1:$nonce:$nc:$cnonce:$qop:$ha2")
                      else               md5("$ha1:$nonce:$ha2")
-
         return buildString {
             append("Digest username=\"$username\", realm=\"$realm\", nonce=\"$nonce\", uri=\"$uri\", ")
             if (qop.isNotEmpty()) append("qop=$qop, nc=$nc, cnonce=\"$cnonce\", ")
@@ -339,37 +296,78 @@ class FritzBoxClient(
         }
     }
 
-    private fun buildSoapEnvelope(
-        serviceType: String, actionName: String, arguments: Map<String, String>
-    ): String {
-        val argsXml = arguments.entries.joinToString("") { (k, v) -> "<$k>$v</$k>" }
-        return """<?xml version="1.0" encoding="utf-8"?>
+    // ── XML / util helpers ────────────────────────────────────────────────────
+
+    private fun buildSoapEnvelope(serviceType: String, actionName: String, args: Map<String, String>) =
+        """<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
             s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
   <s:Body>
     <u:$actionName xmlns:u="$serviceType">
-      $argsXml
+      ${args.entries.joinToString("") { (k, v) -> "<$k>$v</$k>" }}
     </u:$actionName>
   </s:Body>
 </s:Envelope>"""
-    }
 
+    /**
+     * Parses XML with XXE protection:
+     * - DOCTYPE declarations disabled
+     * - External general and parameter entities disabled
+     * Prevents XML External Entity attacks from malicious FritzBox responses.
+     */
     private fun parseXml(xml: String): org.w3c.dom.Document {
-        val factory = DocumentBuilderFactory.newInstance().also { it.isNamespaceAware = false }
+        val factory = DocumentBuilderFactory.newInstance().also { f ->
+            f.isNamespaceAware = false
+            // XXE protection — disable external entity resolution
+            runCatching {
+                f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                f.setFeature("http://xml.org/sax/features/external-general-entities", false)
+                f.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+                f.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            }
+            f.isXIncludeAware  = false
+            f.isExpandEntityReferences = false
+        }
         return factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
     }
 
-    private fun md5(input: String): String {
-        val hash = MessageDigest.getInstance("MD5").digest(input.toByteArray(Charsets.UTF_8))
-        return hash.joinToString("") { "%02x".format(it) }
+    private fun md5(input: String): String =
+        MessageDigest.getInstance("MD5").digest(input.toByteArray(Charsets.UTF_8)).toHexString()
+
+    private fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }
+
+    private fun String.hexToBytes(): ByteArray {
+        val data = ByteArray(length / 2)
+        for (i in data.indices)
+            data[i] = ((Character.digit(this[i * 2], 16) shl 4) + Character.digit(this[i * 2 + 1], 16)).toByte()
+        return data
     }
 
-    private fun String.extractDigestParam(param: String): String =
+    private fun String.extractDigestParam(param: String) =
         Regex("""$param="([^"]*?)"""").find(this)?.groupValues?.get(1) ?: ""
+
+    private fun String.extractXmlTag(tag: String) =
+        substringAfter("<$tag>", "").substringBefore("</$tag>", "").trim()
 
     private fun Element.getChildText(tag: String): String {
         val nodes = getElementsByTagName(tag)
         return if (nodes.length > 0) nodes.item(0).textContent.trim() else ""
+    }
+
+    private fun <T> wrapIo(operation: String, block: () -> T): T = try {
+        block()
+    } catch (e: FritzBoxException) {
+        throw e
+    } catch (e: java.net.ConnectException) {
+        throw FritzBoxException("Keine Verbindung zu ${profile.host}:${profile.port} ($operation)", e)
+    } catch (e: java.net.SocketTimeoutException) {
+        throw FritzBoxException("Zeitüberschreitung bei ${profile.host}:${profile.port} ($operation)", e)
+    } catch (e: java.net.UnknownHostException) {
+        throw FritzBoxException("Host nicht gefunden: ${profile.host}", e)
+    } catch (e: javax.net.ssl.SSLException) {
+        throw FritzBoxException("SSL-Fehler bei ${profile.host} ($operation): ${e.message}", e)
+    } catch (e: IOException) {
+        throw FritzBoxException("Netzwerkfehler bei $operation: ${e.message}", e)
     }
 }
 

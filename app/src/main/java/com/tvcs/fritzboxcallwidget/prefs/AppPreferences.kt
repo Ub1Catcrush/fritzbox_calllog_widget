@@ -4,43 +4,16 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import androidx.preference.PreferenceManager
+import com.tvcs.fritzboxcallwidget.api.ConnectionProfile
+import com.tvcs.fritzboxcallwidget.api.profilesFromJsonString
+import com.tvcs.fritzboxcallwidget.api.toJsonString
 import com.tvcs.fritzboxcallwidget.widget.WidgetColors
 
 class AppPreferences(context: Context) {
 
     private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
 
-    // ── Connection ─────────────────────────────────────────────────────────────
-
-    /** LAN-Adresse (Heimnetz), z.B. "fritz.box" oder "192.168.178.1" */
-    var fritzLanHost: String
-        get() = prefs.getString(KEY_LAN_HOST, "fritz.box") ?: "fritz.box"
-        set(v) = prefs.edit().putString(KEY_LAN_HOST, v).apply()
-
-    /** Internet-/MyFRITZ-Adresse, z.B. "abc123.myfritz.net" oder öffentliche IP */
-    var fritzInternetHost: String
-        get() = prefs.getString(KEY_INTERNET_HOST, "") ?: ""
-        set(v) = prefs.edit().putString(KEY_INTERNET_HOST, v).apply()
-
-    /** TR-064-Port für LAN (Standard 49000) */
-    var fritzLanPort: Int
-        get() = prefs.getString(KEY_LAN_PORT, "49000")?.toIntOrNull() ?: 49000
-        set(v) = prefs.edit().putString(KEY_LAN_PORT, v.toString()).apply()
-
-    /** TR-064-Port für Internet (Standard 49000; bei MyFRITZ oft 49443) */
-    var fritzInternetPort: Int
-        get() = prefs.getString(KEY_INTERNET_PORT, "49000")?.toIntOrNull() ?: 49000
-        set(v) = prefs.edit().putString(KEY_INTERNET_PORT, v.toString()).apply()
-
-    /** Rückwärtskompatibilität: primäre Adresse = LAN */
-    var fritzHost: String
-        get() = fritzLanHost
-        set(v) { fritzLanHost = v }
-
-    var fritzPort: Int
-        get() = fritzLanPort
-        set(v) { fritzLanPort = v }
-
+    // ── Credentials (shared across all connection types) ───────────────────────
     var fritzUsername: String
         get() = prefs.getString(KEY_USERNAME, "") ?: ""
         set(v) = prefs.edit().putString(KEY_USERNAME, v).apply()
@@ -49,19 +22,23 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_PASSWORD, "") ?: ""
         set(v) = prefs.edit().putString(KEY_PASSWORD, v).apply()
 
-    var useHttps: Boolean
-        get() = prefs.getBoolean(KEY_HTTPS, false)
-        set(v) = prefs.edit().putBoolean(KEY_HTTPS, v).apply()
+    // ── Connection profiles (ordered list, JSON-serialised) ────────────────────
+    fun getOrderedProfiles(): List<ConnectionProfile> {
+        val json = prefs.getString(KEY_PROFILES, null) ?: return ConnectionProfile.defaults()
+        return profilesFromJsonString(json)
+    }
 
-    /** Ob MyFRITZ-Modus (Session-ID + CSV) statt TR-064 SOAP genutzt werden soll */
-    var useMyFritz: Boolean
-        get() = prefs.getBoolean(KEY_MYFRITZ, false)
-        set(v) = prefs.edit().putBoolean(KEY_MYFRITZ, v).apply()
+    fun saveOrderedProfiles(profiles: List<ConnectionProfile>) {
+        prefs.edit().putString(KEY_PROFILES, profiles.toJsonString()).apply()
+    }
 
-    /** Ob LAN-zuerst-Fallback aktiv ist (versuche LAN, dann Internet) */
-    var lanFirstFallback: Boolean
-        get() = prefs.getBoolean(KEY_LAN_FIRST_FALLBACK, true)
-        set(v) = prefs.edit().putBoolean(KEY_LAN_FIRST_FALLBACK, v).apply()
+    fun updateProfile(index: Int, updated: ConnectionProfile) {
+        val list = getOrderedProfiles().toMutableList()
+        if (index in list.indices) {
+            list[index] = updated
+            saveOrderedProfiles(list)
+        }
+    }
 
     // ── Refresh / data ─────────────────────────────────────────────────────────
     var refreshIntervalSeconds: Int
@@ -93,7 +70,7 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_FONT_SIZE, "11")?.toFloatOrNull() ?: 11f
         set(v) = prefs.edit().putString(KEY_FONT_SIZE, v.toString()).apply()
 
-    // ── Light-mode colors ──────────────────────────────────────────────────────
+    // ── Colors ─────────────────────────────────────────────────────────────────
     var lightHeaderBg: Int
         get() = prefs.getInt(KEY_LIGHT_HEADER_BG, DEFAULT_HEADER_BG)
         set(v) = prefs.edit().putInt(KEY_LIGHT_HEADER_BG, v).apply()
@@ -127,8 +104,6 @@ class AppPreferences(context: Context) {
     var lightError: Int
         get() = prefs.getInt(KEY_LIGHT_ERROR, DEFAULT_ERROR)
         set(v) = prefs.edit().putInt(KEY_LIGHT_ERROR, v).apply()
-
-    // ── Dark-mode colors ───────────────────────────────────────────────────────
     var darkHeaderBg: Int
         get() = prefs.getInt(KEY_DARK_HEADER_BG, DARK_HEADER_BG)
         set(v) = prefs.edit().putInt(KEY_DARK_HEADER_BG, v).apply()
@@ -163,17 +138,12 @@ class AppPreferences(context: Context) {
         get() = prefs.getInt(KEY_DARK_ERROR, DARK_ERROR)
         set(v) = prefs.edit().putInt(KEY_DARK_ERROR, v).apply()
 
-    // ── Resolved colors ────────────────────────────────────────────────────────
-    fun resolvedColors(context: Context): WidgetColors {
-        return if (effectiveIsDark(context)) {
-            WidgetColors(darkHeaderBg, darkHeaderText, darkColHeaderBg, darkColHeaderText,
-                darkWidgetBg, darkRowEven, darkRowOdd, darkTextPrimary, darkTextSecondary,
-                darkDivider, darkError)
-        } else {
-            WidgetColors(lightHeaderBg, lightHeaderText, lightColHeaderBg, lightColHeaderText,
-                lightWidgetBg, lightRowEven, lightRowOdd, lightTextPrimary, lightTextSecondary,
-                lightDivider, lightError)
-        }
+    fun resolvedColors(context: Context): WidgetColors = if (effectiveIsDark(context)) {
+        WidgetColors(darkHeaderBg, darkHeaderText, darkColHeaderBg, darkColHeaderText,
+            darkWidgetBg, darkRowEven, darkRowOdd, darkTextPrimary, darkTextSecondary, darkDivider, darkError)
+    } else {
+        WidgetColors(lightHeaderBg, lightHeaderText, lightColHeaderBg, lightColHeaderText,
+            lightWidgetBg, lightRowEven, lightRowOdd, lightTextPrimary, lightTextSecondary, lightDivider, lightError)
     }
 
     fun effectiveIsDark(context: Context): Boolean = when (theme) {
@@ -188,25 +158,16 @@ class AppPreferences(context: Context) {
     }
 
     companion object {
-        const val KEY_LAN_HOST          = "pref_lan_host"
-        const val KEY_INTERNET_HOST     = "pref_internet_host"
-        const val KEY_LAN_PORT          = "pref_lan_port"
-        const val KEY_INTERNET_PORT     = "pref_internet_port"
-        // Legacy key kept so existing installs don't lose their host setting
-        const val KEY_HOST              = "pref_host"
-        const val KEY_PORT              = "pref_port"
-        const val KEY_USERNAME          = "pref_username"
-        const val KEY_PASSWORD          = "pref_password"
-        const val KEY_HTTPS             = "pref_https"
-        const val KEY_MYFRITZ           = "pref_myfritz"
-        const val KEY_LAN_FIRST_FALLBACK = "pref_lan_first_fallback"
-        const val KEY_REFRESH           = "pref_refresh"
-        const val KEY_PHONE_PREFIX      = "pref_phone_prefix"
-        const val KEY_MAX_ENTRIES       = "pref_max_entries"
-        const val KEY_THEME             = "pref_theme"
-        const val KEY_LANGUAGE          = "pref_language"
-        const val KEY_FONT_FAMILY       = "pref_font_family"
-        const val KEY_FONT_SIZE         = "pref_font_size"
+        const val KEY_PROFILES      = "pref_connection_profiles"
+        const val KEY_USERNAME      = "pref_username"
+        const val KEY_PASSWORD      = "pref_password"
+        const val KEY_REFRESH       = "pref_refresh"
+        const val KEY_PHONE_PREFIX  = "pref_phone_prefix"
+        const val KEY_MAX_ENTRIES   = "pref_max_entries"
+        const val KEY_THEME         = "pref_theme"
+        const val KEY_LANGUAGE      = "pref_language"
+        const val KEY_FONT_FAMILY   = "pref_font_family"
+        const val KEY_FONT_SIZE     = "pref_font_size"
 
         const val KEY_LIGHT_HEADER_BG       = "pref_color_header_bg"
         const val KEY_LIGHT_HEADER_TEXT     = "pref_color_header_text"

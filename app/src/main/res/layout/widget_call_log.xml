@@ -95,7 +95,24 @@
             android:textSize="10sp"
             android:textStyle="bold"
             android:textColor="@color/widget_col_header_text" />
-    </LinearLayout>
+    
+    <!-- Error overlay: shown when displaying cached data after a failed refresh -->
+    <TextView
+        android:id="@+id/tv_error_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:textSize="10sp"
+        android:textColor="#FFCCCC"
+        android:background="#CC8B0000"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
+</LinearLayout>
 
     <!-- Loading -->
     <TextView
@@ -143,6 +160,23 @@
         android:textSize="12sp"
         android:textColor="@color/widget_text_secondary"
         android:padding="16dp"
+        android:visibility="gone" />
+
+
+    <!-- Error overlay: shown when displaying cached data after a failed refresh -->
+    <TextView
+        android:id="@+id/tv_error_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:textSize="10sp"
+        android:textColor="#FFCCCC"
+        android:background="#CC8B0000"
+        android:singleLine="true"
+        android:ellipsize="end"
         android:visibility="gone" />
 
 </LinearLayout>

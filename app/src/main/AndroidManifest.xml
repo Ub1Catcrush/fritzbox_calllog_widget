@@ -27,6 +27,13 @@
             android:exported="false"
             android:theme="@android:style/Theme.NoDisplay" />
 
+
+        <!-- Connection profile list with connectivity check -->
+        <activity
+            android:name=".prefs.ConnectionProfilesActivity"
+            android:exported="false"
+            android:label="@string/pref_connections_title"
+            android:parentActivityName=".prefs.SettingsActivity" />
         <!-- Settings Activity -->
         <activity
             android:name=".prefs.SettingsActivity"

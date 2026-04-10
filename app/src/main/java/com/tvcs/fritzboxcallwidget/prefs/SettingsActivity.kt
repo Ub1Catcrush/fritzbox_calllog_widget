@@ -12,6 +12,7 @@ import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.tvcs.fritzboxcallwidget.R
+import android.content.Intent
 import com.tvcs.fritzboxcallwidget.api.CallRepository
 import com.tvcs.fritzboxcallwidget.widget.CallLogWidget
 import kotlinx.coroutines.delay
@@ -112,17 +113,10 @@ class SettingsActivity : AppCompatActivity() {
                     ?.setOnPreferenceChangeListener { _, _ -> scheduleWidgetRefresh(); true }
             }
 
-            // Data / connection
+            // Data / connection — profile changes handled via ConnectionProfilesActivity
             listOf(
-                AppPreferences.KEY_LAN_HOST,
-                AppPreferences.KEY_LAN_PORT,
-                AppPreferences.KEY_LAN_FIRST_FALLBACK,
-                AppPreferences.KEY_INTERNET_HOST,
-                AppPreferences.KEY_INTERNET_PORT,
                 AppPreferences.KEY_USERNAME,
                 AppPreferences.KEY_PASSWORD,
-                AppPreferences.KEY_HTTPS,
-                AppPreferences.KEY_MYFRITZ,
                 AppPreferences.KEY_PHONE_PREFIX,
                 AppPreferences.KEY_REFRESH,
                 AppPreferences.KEY_MAX_ENTRIES
@@ -139,7 +133,13 @@ class SettingsActivity : AppCompatActivity() {
                     scheduleWidgetRefresh(); true
                 }
 
-            findPreference<Preference>("pref_test_connection")
+            findPreference<Preference>("pref_open_connections")
+                ?.setOnPreferenceClickListener {
+                    startActivity(Intent(requireContext(), ConnectionProfilesActivity::class.java))
+                    true
+                }
+
+                        findPreference<Preference>("pref_test_connection")
                 ?.setOnPreferenceClickListener { testConnection(); true }
         }
 

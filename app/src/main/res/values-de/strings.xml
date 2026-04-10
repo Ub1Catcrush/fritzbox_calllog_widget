@@ -77,4 +77,19 @@
     <string name="colors_reset">Farben auf Theme-Standard zurückgesetzt.</string>
     <string name="pref_category_colors_light">Hell-Modus Farben</string>
     <string name="pref_category_colors_dark">Dunkel-Modus Farben</string>
+    <string name="pref_connections_title">Verbindungs-Priorität</string>
+    <string name="pref_connections_summary">LAN TR-064, Internet TR-064 und MyFRITZ-Verbindungen konfigurieren und priorisieren</string>
+    <string name="profile_order_hint">Zum Umsortieren ziehen. Die App versucht Verbindungen von oben nach unten. Nicht benötigte Optionen deaktivieren.</string>
+    <string name="profile_min_one_required">Mindestens eine Verbindung muss aktiv bleiben.</string>
+    <string name="not_configured">Nicht konfiguriert</string>
+    <string name="drag_to_reorder">Zum Sortieren ziehen</string>
+    <string name="edit_profile">Verbindung bearbeiten</string>
+    <string name="test_connection">Verbindung testen</string>
+    <string name="myfritz_port_hint">MyFRITZ verwendet typischerweise Port 80 (HTTP) oder 443 (HTTPS), nicht 49000.</string>
+    <string name="pref_host_title">Adresse</string>
+    <string name="pref_port_title">Port</string>
+    <string name="checking_connection">Prüfe: %s</string>
+    <string name="check_result_ok">Alle Prüfungen bestanden.</string>
+    <string name="check_result_failed">%d Prüfung(en) fehlgeschlagen.</string>
+    <string name="check_result_warning">%d Warnung(en).</string>
 </resources>
