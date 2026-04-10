@@ -146,7 +146,6 @@
         android:padding="16dp"
         android:visibility="gone" />
 
-
     <!-- Error overlay: shown when displaying cached data after a failed refresh -->
     <TextView
         android:id="@+id/tv_error_overlay"
