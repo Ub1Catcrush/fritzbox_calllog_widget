@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.OkHttpClient
@@ -235,7 +236,7 @@ object ConnectivityChecker {
         val labelLogin = "MyFRITZ Login-Seite"
         running(labelLogin)
         val challengeXml = runCatching {
-            client.newCall(Request.Builder().url("$baseUrl/login_sid.lua?version=2").build())
+            client.newCall(Request.Builder().url("$baseUrl/login_sid.lua?version=1").build())
                 .execute().use { r ->
                     if (!r.isSuccessful) throw Exception("HTTP ${r.code}")
                     r.body?.string() ?: throw Exception("Leere Antwort")
@@ -246,6 +247,21 @@ object ConnectivityChecker {
             fail(labelLogin, "Keine Challenge — falscher Port oder Endpunkt")
             return
         }
+
+        // --- BLOCKTIME LOGIK ---
+        val blockTime = challengeXml.substringAfter("<BlockTime>").substringBefore("</BlockTime>").trim().toIntOrNull() ?: 0
+        if (blockTime > 0) {
+            val labelWait = "Brute-Force Schutz"
+            // Countdown-Schleife von blockTime bis 1
+            for (secondsLeft in blockTime downTo 1) {
+                running("$labelWait: Warten für $secondsLeft Sek.")
+                kotlinx.coroutines.delay(1000L)
+            }
+            // Kurzes Update, bevor es weitergeht
+            running("$labelWait: Bereit...")
+        }
+        // -----------------------
+
         val challenge = challengeXml.substringAfter("<Challenge>").substringBefore("</Challenge>").trim()
         val proto = if (challenge.startsWith("2\$")) "v2 (PBKDF2)" else "v1 (MD5)"
         ok(labelLogin, "Challenge erhalten · Protokoll $proto")
@@ -254,7 +270,8 @@ object ConnectivityChecker {
         val labelSid = "MyFRITZ Anmeldung"
         running(labelSid)
         val existingSid = challengeXml.substringAfter("<SID>").substringBefore("</SID>").trim()
-        val sid = if (existingSid != "0000000000000000") {
+
+        val sid = if (existingSid != "0000000000000000" && existingSid.isNotBlank()) {
             ok(labelSid, "Bestehende Session aktiv")
             existingSid
         } else {
@@ -264,20 +281,27 @@ object ConnectivityChecker {
                 computeMd5Response(challenge, password)
 
             val authUrl = "$baseUrl/login_sid.lua?version=2"
-                .toHttpUrl()?.newBuilder() // Safe Call hier
+                .toHttpUrlOrNull()?.newBuilder()
                 ?.addQueryParameter("username", username)
                 ?.addQueryParameter("response", response)
-                ?.build() ?: throw Exception("Ungültige Auth-URL") // Fallback, falls URL-Parsing fehlschlägt
+                ?.build() ?: throw Exception("Ungültige Auth-URL")
 
             val authXml = runCatching {
-                // Hier ist authUrl jetzt garantiert nicht null
                 client.newCall(Request.Builder().url(authUrl).build())
                     .execute().use { r -> r.body?.string() ?: "" }
             }.getOrElse { e -> fail(labelSid, e.message ?: "Fehler"); return }
 
             val newSid = authXml.substringAfter("<SID>").substringBefore("</SID>").trim()
-            if (newSid == "0000000000000000" || newSid.isBlank()) {
-                fail(labelSid, "Anmeldung fehlgeschlagen — Benutzername oder Passwort falsch")
+
+            // Erneute BlockTime Prüfung nach fehlgeschlagenem Login
+            if (newSid == "0000000000000000") {
+                val newBlockTime = authXml.substringAfter("<BlockTime>").substringBefore("</BlockTime>").trim().toIntOrNull() ?: 0
+                val errorMsg = if (newBlockTime > 0)
+                    "Falsche Daten. Box sperrt für $newBlockTime Sek."
+                else
+                    "Benutzername oder Passwort falsch"
+
+                fail(labelSid, errorMsg)
                 return
             }
             ok(labelSid, "SID erhalten")

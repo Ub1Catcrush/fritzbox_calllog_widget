@@ -22,6 +22,7 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.ConnectionSpec
 import okio.ByteString.Companion.decodeHex
@@ -127,7 +128,7 @@ class FritzBoxClient(
      * v2 reference: https://avm.de/service/schnittstellen/
      */
     private fun loginMyFritz(): String = wrapIo("MyFRITZ login") {
-        val loginUrl = "$baseUrl/login_sid.lua?version=2"
+        val loginUrl = "$baseUrl/login_sid.lua?version=1"
 
         val challengeXml = httpClient.newCall(
             Request.Builder().url(loginUrl).build()
@@ -148,6 +149,15 @@ class FritzBoxClient(
             computePbkdf2Response(challenge)
         else
             computeMd5Response(challenge)
+
+        // --- BLOCKTIME LOGIK ---
+        val blockTime = challengeXml.substringAfter("<BlockTime>").substringBefore("</BlockTime>").trim().toIntOrNull() ?: 0
+        if (blockTime > 0) {
+            // Countdown-Schleife von blockTime bis 1
+            Log.w(TAG, "FritzBox fordert eine Wartezeit von $blockTime Sekunden (Brute-Force-Schutz)")
+            Thread.sleep(blockTime * 1000L)
+        }
+        // -----------------------
 
         val authUrl = loginUrl.toHttpUrl().newBuilder()
             .addQueryParameter("username", username)

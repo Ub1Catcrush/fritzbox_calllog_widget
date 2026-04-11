@@ -66,6 +66,7 @@ class CallRepository(private val prefs: AppPreferences) {
 
             onProgress(Progress("Verbinde mit ${profile.displayName} (${profile.host})…"))
 
+//            val result = fetchWithoutRetry(profile, onProgress)
             val result = fetchWithRetry(profile, onProgress)
             if (result.isSuccess) {
                 val entries = result.getOrThrow()
@@ -91,6 +92,33 @@ class CallRepository(private val prefs: AppPreferences) {
             Result.failure(lastError ?: Exception("Alle Verbindungsversuche fehlgeschlagen"))
         } else {
             Result.failure(lastError ?: Exception("Alle Verbindungsversuche fehlgeschlagen"))
+        }
+    }
+
+    private suspend fun fetchWithoutRetry(
+        profile: ConnectionProfile,
+        onProgress: (Progress) -> Unit
+    ): Result<List<CallEntry>> {
+        return try {
+            // Initialer Status für die UI
+            onProgress(Progress("${profile.displayName}: Verbinde...", isError = false))
+
+            val client = FritzBoxClient(profile, prefs.fritzUsername, prefs.fritzPassword)
+            val rawEntries = client.getCallList()
+
+            val entries = rawEntries.mapNotNull { raw ->
+                try {
+                    mapEntry(raw, prefs.phonePrefix)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Überpringe unlesbaren Eintrag: $raw", e)
+                    null
+                }
+            }.sortedByDescending { it.date }
+
+            Result.success(entries)
+        } catch (e: Exception) {
+            Log.e(TAG, "Fehler beim Abrufen von ${profile.host}: ${e.message}")
+            Result.failure(e)
         }
     }
 
