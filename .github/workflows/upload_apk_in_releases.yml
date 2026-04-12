@@ -69,14 +69,32 @@ jobs:
       - name: Build bundle release AAB
         run: bash ./gradlew bundleRelease --stacktrace
 
+      - name: Extract version from dependencies.gradle
+        id: get_version
+        run: |
+          # Extrahiere die Werte mit Regex aus der Datei
+          MAJOR=$(grep "versionMajor" dependencies.gradle | sed 's/[^0-9]*//g')
+          MINOR=$(grep "versionMinor" dependencies.gradle | sed 's/[^0-9]*//g')
+          PATCH=$(grep "versionPatch" dependencies.gradle | sed 's/[^0-9]*//g')
+          
+          # Baue den String zusammen
+          VERSION_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          
+          # Speichere es für den restlichen Workflow (GITHUB_ENV oder GITHUB_OUTPUT)
+          echo "VERSION_TAG=${VERSION_TAG}" >> $GITHUB_ENV
+          echo "tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
-          tag_name: release-v${{ github.run_number }}
-          release_name: Automatic Release ${{ github.run_number }}
+          tag_name: ${{ env.VERSION_TAG }}
+          name: Release ${{ env.VERSION_TAG }}
+          release_name: Release ${{ env.VERSION_TAG }}
+#          tag_name: release-v${{ github.run_number }}
+#          release_name: Automatic Release ${{ github.run_number }}
           draft: false
           prerelease: false
 
