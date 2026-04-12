@@ -59,9 +59,10 @@ Repo: https://github.com/Ub1Catcrush/fritzbox_calllog_widget
 # (.github/workflows/upload_apk_in_releases.yml) and uploaded as
 # app-release-signed.apk to every release.
 #
-# The %v placeholder is replaced by F-Droid with CurrentVersion (e.g. 1.0.32),
+# The %v placeholder is replaced by F-Droid with CurrentVersion (e.g. 1.0.33),
 # producing the exact URL of the release asset.
 Binaries: https://github.com/Ub1Catcrush/fritzbox_calllog_widget/releases/download/release-v%v/app-release-signed.apk
+AllowedAPKSigningKeys: 75c6d7b50fbe16afc20cd0a91949425a9c14d0f7dc4562b2c03826bf257ee508
 
 AutoUpdateMode: Version %v
 UpdateCheckMode: Tags
@@ -71,5 +72,5 @@ UpdateCheckMode: Tags
 # via the formula defined in the Builds section or from the APK manifest directly.
 # Since we use Binaries (no build), F-Droid reads versionCode from the APK itself.
 UpdateCheckData: dependencies.gradle|versionPatch:(\d+)|.|.
-CurrentVersion: 1.0.32
-CurrentVersionCode: 1000032
+CurrentVersion: 1.0.33
+CurrentVersionCode: 1000033
