@@ -125,7 +125,7 @@ jobs:
       - name: Verify aligned APK signature
         run: |
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify \
-            --verbose \
+            --verbose --print-certs \
             app/build/outputs/apk/release/app-release-signed.apk
 
       - name: Verify aligned AAB signature
