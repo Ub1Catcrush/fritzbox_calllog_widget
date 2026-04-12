@@ -1,0 +1,2 @@
+json_key_file("")     # Path to Google Play service account JSON key
+package_name("com.tvcs.fritzboxcallwidget")

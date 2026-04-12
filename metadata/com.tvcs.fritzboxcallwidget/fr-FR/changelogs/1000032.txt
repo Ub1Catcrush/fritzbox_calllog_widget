@@ -1,0 +1,1 @@
+Trois profils de connexion indépendants : LAN TR-064, Internet TR-064 et Internet MyFRITZ. Liste de priorité réordonnables par glisser-déposer. Connexion MyFRITZ compatible protocole v2 (PBKDF2) avec repli automatique sur v1. Vérificateur de connexion en direct. Le widget affiche la liste en cache pendant l'actualisation.

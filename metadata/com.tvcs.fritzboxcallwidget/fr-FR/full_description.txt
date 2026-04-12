@@ -1,0 +1,20 @@
+FritzBox CallLog Widget affiche l'historique des appels de votre FRITZ!Box AVM directement sur l'écran d'accueil Android sous forme de widget redimensionnable et défilant.
+
+CONNECTIVITÉ
+Connexion via LAN (TR-064), Internet distant (TR-064) ou API de session MyFRITZ. Les trois profils sont configurables indépendamment avec leur propre hôte, port et paramètre HTTPS. Les profils sont essayés dans un ordre de priorité défini par l'utilisateur avec basculement automatique et nouvelle tentative à rebond exponentiel.
+
+JOURNAL D'APPELS
+Le widget affiche les appels entrants, sortants et manqués avec icônes colorées, date, heure et nom ou numéro. Un appui sur une ligne ouvre le composeur système avec le numéro pré-rempli. La dernière liste chargée est toujours affichée, même pendant une actualisation en arrière-plan.
+
+APPARENCE
+Les onze couleurs du widget sont personnalisables indépendamment pour les modes clair et sombre via un sélecteur de couleur ARGB. La taille de police est réglable de 8 à 16 sp.
+
+DIAGNOSTIC
+Un vérificateur de connexion pas à pas analyse la résolution DNS, la connexion TCP, l'accessibilité HTTP, la description du service TR-064, l'authentification et le téléchargement de la liste d'appels.
+
+AUTRES FONCTIONNALITÉS
+* Préfixe de numéro de téléphone (ex. 0621 → +33621)
+* Intervalle d'actualisation configurable
+* Thème clair / sombre / système
+* Disponible en anglais, allemand, français et espagnol
+* Open source — GPL-3.0

@@ -1,0 +1,22 @@
+FritzBox Anruflisten-Widget zeigt das Anrufprotokoll deiner AVM FRITZ!Box direkt auf dem Android-Startbildschirm als skalierbares, scrollbares Widget.
+
+VERBINDUNG
+Verbindung über LAN (TR-064), Internet (TR-064) oder MyFRITZ-Session-API. Alle drei Profile sind unabhängig mit eigenem Host, Port und HTTPS-Einstellung konfigurierbar. Profile werden in benutzerdefinierter Priorität mit automatischem Fallback und exponentiellem Backoff-Retry versucht — das Widget bleibt auch beim Wechsel zwischen WLAN und mobilem Netz erreichbar.
+
+ANRUFLISTE
+Das Widget zeigt eingehende, ausgehende und verpasste Anrufe mit farbigen Pfeilsymbolen, Datum, Uhrzeit und Name oder Nummer. Ein Tipp auf eine Zeile öffnet den Systemwähler mit der Nummer. Die zuletzt geladene Liste wird immer angezeigt — auch während einer Aktualisierung. Fehler erscheinen als dezentes rotes Overlay, das die Daten nicht ersetzt.
+
+DARSTELLUNG
+Alle elf Widget-Farben (Kopfzeile, Spaltenköpfe, Hintergrund, gerade und ungerade Zeilen, primärer und sekundärer Text, Trennlinie, Fehler) sind unabhängig für Hell- und Dunkelmodus per ARGB-Farbwähler anpassbar. Schriftgröße einstellbar von 8 bis 16 sp. Das Widget zeichnet sich bei Größenänderung automatisch neu.
+
+DIAGNOSE
+Ein eingebauter schrittweiser Verbindungstest führt für jedes Profil durch DNS-Auflösung, TCP-Verbindung, HTTP-Erreichbarkeit, TR-064-Dienstbeschreibung, Authentifizierung und Anruflistendownload — mit Live-Ergebnissen zur schnellen Fehlersuche.
+
+WEITERE FUNKTIONEN
+* Rufnummernpräfix — ersetzt führende 0 durch Ländervorwahl (z.B. 0621 → +49621)
+* Einstellbares Aktualisierungsintervall
+* Maximale Eintragsanzahl konfigurierbar
+* Hell/Dunkel/System-Theme
+* Verfügbar in Englisch, Deutsch, Französisch und Spanisch
+* Ab Android 8.0 (API 26) aufwärts; nutzt RemoteCollectionItems ab Android 12+
+* Open Source — GPL-3.0

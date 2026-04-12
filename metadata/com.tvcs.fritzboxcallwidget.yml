@@ -6,42 +6,55 @@ SourceCode: https://github.com/Ub1Catcrush/fritzbox_calllog_widget
 IssueTracker: https://github.com/Ub1Catcrush/fritzbox_calllog_widget/issues
 
 AutoName: FritzBox CallLog Widget
-Summary: Displays the FritzBox call log as a resizable home screen widget
+Summary: FritzBox call log on your home screen — resizable & customisable
 Description: |-
   A fully customisable Android home screen widget that fetches the call log
-  from an AVM FRITZ!Box router via the TR-064 SOAP API and displays it as a
-  scrollable table with four columns: date, time, call-type icon, and
-  name/number.
+  from an AVM FRITZ!Box router and displays it as a scrollable table with
+  date, time, call-type icon, and caller name or number.
+
+  Connects via LAN TR-064, Internet TR-064, or the MyFRITZ session API.
+  All three profiles are configurable independently with priority ordering,
+  per-profile HTTPS, and automatic fallback with exponential-backoff retry.
+
+  The widget always shows the last successfully loaded list while a background
+  refresh runs. Failed refreshes appear as a subtle overlay, not a blank screen.
 
   Features:
 
-  * Scrollable call list with incoming (blue arrow), outgoing (green arrow) and missed (red square) call-type icons
-  * Tap any row to open the system phone app with the number pre-filled
-  * Freely resizable from a small tile to full screen; redraws on resize
-  * Manual refresh button and settings button in the widget header
-  * Configurable automatic refresh interval (AlarmManager)
-  * HTTP Digest authentication against the FRITZ!Box TR-064 API
-  * HTTPS support (self-signed certificate accepted)
-  * Phone number prefix: replaces leading 0 with an international prefix (e.g. 0621 becomes +49621)
-  * Fully customisable widget colours with separate sets for light and dark mode, 11 colours each (header, column header, background, even/odd rows, primary/secondary text, divider, error text) via an ARGB colour picker with live preview
-  * Adjustable font size (8-16 sp)
-  * Available in English, German, French, and Spanish; widget labels switch language together with the settings UI
-  * Light/dark mode: follows system setting or can be forced manually
-  * On API 31+ uses RemoteCollectionItems (no background service needed), falls back to RemoteViewsService on API 26-30
+  * Incoming, outgoing, missed calls with colour-coded icons
+  * Tap a row to open the system dialler with the number pre-filled
+  * LAN TR-064, Internet TR-064, and MyFRITZ connection profiles
+  * MyFRITZ login supports Protocol v2 (PBKDF2-SHA256) with v1 fallback
+  * Drag-to-reorder connection priority with per-profile enable/disable
+  * Step-by-step connectivity checker with live status per profile
+  * Cached data always shown during refresh; errors appear as subtle overlay
+  * Freely resizable widget, redraws on resize
+  * Manual refresh and settings buttons in the widget header
+  * Configurable refresh interval and maximum entry count
+  * HTTPS support with self-signed certificate acceptance
+  * Phone number prefix (e.g. 0621 becomes +49621)
+  * 11 customisable colours each for light and dark mode via ARGB picker
+  * Adjustable font size 8-16 sp
+  * English, German, French, Spanish
+  * Android 8.0+ (API 26); uses RemoteCollectionItems on Android 12+
 
 RepoType: git
 Repo: https://github.com/Ub1Catcrush/fritzbox_calllog_widget
 
-Builds:
-  - versionName: '1.0'
-    versionCode: 1
-    commit: 9c4f785b10f4fc7d3ccb710d02b1b5e44e907622
-    subdir: app
-    gradle:
-      - yes
+# Entferne die "Builds:" Sektion, wenn du NICHT willst, dass F-Droid selbst kompiliert.
+#Builds:
+#  - versionName: 1.0.32
+#    versionCode: 1000032
+#    commit: release-v54
+#    subdir: app
+#    gradle:
+#      - yes
+# Stattdessen nutzt du Binaries aus den GitHub Releases:
+Binaries: https://github.com
+
 
 AutoUpdateMode: Version %v
 UpdateCheckMode: Tags
-UpdateCheckData: app/build.gradle|versionCode=(\d+)|.|versionName="([\d.]+)"
-CurrentVersion: '1.0'
-CurrentVersionCode: 1
+UpdateCheckData: dependencies.gradle|versionPatch:(\d+)|app/build.gradle|versionName
+CurrentVersion: 1.0.32
+CurrentVersionCode: 1000032
