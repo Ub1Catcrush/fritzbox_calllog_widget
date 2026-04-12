@@ -72,18 +72,17 @@ jobs:
       - name: Extract version from dependencies.gradle
         id: get_version
         run: |
-          # Extrahiere die Werte mit Regex aus der Datei
-          MAJOR=$(grep "versionMajor" dependencies.gradle | sed 's/[^0-9]*//g')
-          MINOR=$(grep "versionMinor" dependencies.gradle | sed 's/[^0-9]*//g')
-          PATCH=$(grep "versionPatch" dependencies.gradle | sed 's/[^0-9]*//g')
+          # Suche nach dem Key, extrahiere den Wert nach dem Doppelpunkt und entferne Kommas/Leerzeichen
+          MAJOR=$(sed -n 's/.*versionMajor:\s*\([0-9]*\).*/\1/p' dependencies.gradle)
+          MINOR=$(sed -n 's/.*versionMinor:\s*\([0-9]*\).*/\1/p' dependencies.gradle)
+          PATCH=$(sed -n 's/.*versionPatch:\s*\([0-9]*\).*/\1/p' dependencies.gradle)
+      
+          # Validierung: Falls ein Wert leer ist, wird v0.0.0 als Fallback gesetzt
+          VERSION_TAG="v${MAJOR:-0}.${MINOR:-0}.${PATCH:-0}"
           
-          # Baue den String zusammen
-          VERSION_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+          echo "tag=$VERSION_TAG" >> $GITHUB_OUTPUT
           
-          # Speichere es für den restlichen Workflow (GITHUB_ENV oder GITHUB_OUTPUT)
-          echo "VERSION_TAG=${VERSION_TAG}" >> $GITHUB_ENV
-          echo "tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
-
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1.1.4
