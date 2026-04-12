@@ -8,53 +8,68 @@ IssueTracker: https://github.com/Ub1Catcrush/fritzbox_calllog_widget/issues
 AutoName: FritzBox CallLog Widget
 Summary: FritzBox call log on your home screen — resizable & customisable
 Description: |-
-  A fully customisable Android home screen widget that fetches the call log
-  from an AVM FRITZ!Box router and displays it as a scrollable table with
-  date, time, call-type icon, and caller name or number.
+  A customisable Android home screen widget that fetches the call log from an
+  AVM FRITZ!Box router and displays it as a scrollable table with date, time,
+  call-type icon, and caller name or number.
 
-  Connects via LAN TR-064, Internet TR-064, or the MyFRITZ session API.
-  All three profiles are configurable independently with priority ordering,
-  per-profile HTTPS, and automatic fallback with exponential-backoff retry.
+  Three independent connection profiles can be configured and prioritised:
+  LAN TR-064, Internet TR-064, and Internet MyFRITZ. Each profile has its own
+  host, port, HTTPS setting, and can be individually enabled or disabled. The
+  app tries profiles in the user-defined order with automatic fallback and
+  exponential-backoff retry (2 s / 4 s / 8 s), keeping the widget reachable
+  when switching between Wi-Fi and mobile data.
 
-  The widget always shows the last successfully loaded list while a background
-  refresh runs. Failed refreshes appear as a subtle overlay, not a blank screen.
+  The last successfully loaded call list is always shown while a background
+  refresh is running. Failed refreshes appear as a subtle error strip at the
+  bottom of the widget rather than replacing the list with an error screen.
+
+  A built-in step-by-step connectivity checker runs six diagnostic steps per
+  profile (DNS, TCP, HTTP, service description, authentication, call list
+  download) and displays live results so any problem can be pinpointed quickly.
 
   Features:
 
-  * Incoming, outgoing, missed calls with colour-coded icons
+  * Incoming, outgoing, and missed calls with colour-coded arrow icons
   * Tap a row to open the system dialler with the number pre-filled
-  * LAN TR-064, Internet TR-064, and MyFRITZ connection profiles
-  * MyFRITZ login supports Protocol v2 (PBKDF2-SHA256) with v1 fallback
-  * Drag-to-reorder connection priority with per-profile enable/disable
+  * LAN TR-064, Internet TR-064, and Internet MyFRITZ connection profiles
+  * Drag-to-reorder profile priority list with per-profile enable/disable
+  * MyFRITZ login with Protocol v2 (PBKDF2-SHA256), auto-fallback to v1 (MD5)
+  * HTTP Digest Auth for TR-064 (RFC 2617)
+  * Per-profile HTTPS with self-signed certificate acceptance
+  * Cached call list always visible during background refresh
+  * Failed refresh shown as subtle overlay, not a blank error screen
   * Step-by-step connectivity checker with live status per profile
-  * Cached data always shown during refresh; errors appear as subtle overlay
-  * Freely resizable widget, redraws on resize
+  * Freely resizable widget; redraws automatically on resize
   * Manual refresh and settings buttons in the widget header
   * Configurable refresh interval and maximum entry count
-  * HTTPS support with self-signed certificate acceptance
-  * Phone number prefix (e.g. 0621 becomes +49621)
-  * 11 customisable colours each for light and dark mode via ARGB picker
-  * Adjustable font size 8-16 sp
-  * English, German, French, Spanish
-  * Android 8.0+ (API 26); uses RemoteCollectionItems on Android 12+
+  * Phone number prefix — replaces leading 0 with a country code
+  * 11 independently customisable colours for light and dark mode
+  * ARGB colour picker with sliders, hex input, and live swatch preview
+  * Adjustable font size (8-16 sp)
+  * English, German, French, and Spanish
+  * Android 8.0 (API 26) and above
+  * Uses RemoteCollectionItems on Android 12+ (no background service needed)
+  * Open source — GPL-3.0
 
 RepoType: git
 Repo: https://github.com/Ub1Catcrush/fritzbox_calllog_widget
 
-# Entferne die "Builds:" Sektion, wenn du NICHT willst, dass F-Droid selbst kompiliert.
-#Builds:
-#  - versionName: 1.0.32
-#    versionCode: 1000032
-#    commit: release-v54
-#    subdir: app
-#    gradle:
-#      - yes
-# Stattdessen nutzt du Binaries aus den GitHub Releases:
-Binaries: https://github.com
-
+# F-Droid uses the signed APK from GitHub Releases directly — no in-house build.
+# The APK is built and signed by the GitHub Actions workflow
+# (.github/workflows/upload_apk_in_releases.yml) and uploaded as
+# app-release-signed.apk to every release.
+#
+# The %v placeholder is replaced by F-Droid with CurrentVersion (e.g. 1.0.32),
+# producing the exact URL of the release asset.
+Binaries: https://github.com/Ub1Catcrush/fritzbox_calllog_widget/releases/download/release-v%v/app-release-signed.apk
 
 AutoUpdateMode: Version %v
 UpdateCheckMode: Tags
-UpdateCheckData: dependencies.gradle|versionPatch:(\d+)|app/build.gradle|versionName
+# Extract versionCode and versionName from dependencies.gradle.
+# versionCode = versionMajor*1000000 + versionMinor*10000 + versionPatch
+# The regex below captures versionPatch; F-Droid derives the full versionCode
+# via the formula defined in the Builds section or from the APK manifest directly.
+# Since we use Binaries (no build), F-Droid reads versionCode from the APK itself.
+UpdateCheckData: dependencies.gradle|versionPatch:(\d+)|.|.
 CurrentVersion: 1.0.32
 CurrentVersionCode: 1000032
