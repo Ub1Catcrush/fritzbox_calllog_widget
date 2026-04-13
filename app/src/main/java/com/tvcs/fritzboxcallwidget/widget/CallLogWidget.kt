@@ -107,7 +107,7 @@ class CallLogWidget : AppWidgetProvider() {
                 for (id in ids) updateWidget(context, manager, id, s, prefs)
             }
 
-            val result = repo.fetchCallLog()
+            val result = repo.fetchCallLog(context)
             val state = result.fold(
                 onSuccess = { calls -> State.Success(calls.take(prefs.maxEntries)) },
                 onFailure = { error ->

@@ -92,4 +92,11 @@
     <string name="check_result_ok">Todas las comprobaciones superadas.</string>
     <string name="check_result_failed">%d comprobación(es) fallida(s).</string>
     <string name="check_result_warning">%d advertencia(s).</string>
+    <string name="network_status">Estado de la red</string>
+    <string name="network_available">Red disponible</string>
+    <string name="network_no_network">Sin red — el dispositivo está sin conexión o en modo avión</string>
+    <string name="network_battery_saver">Ahorro de batería activo — las conexiones en segundo plano pueden estar limitadas</string>
+    <string name="network_data_saver">Ahorro de datos activo — los datos en segundo plano pueden estar bloqueados</string>
+    <string name="network_battery_data_saver">Ahorro de batería y datos activos — conexiones en segundo plano limitadas</string>
+    <string name="network_restricted_hint">Se intentará la conexión de todas formas</string>
 </resources>

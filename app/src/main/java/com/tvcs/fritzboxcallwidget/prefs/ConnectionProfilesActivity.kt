@@ -157,7 +157,8 @@ class ConnectionProfilesActivity : AppCompatActivity() {
             val steps = ConnectivityChecker.check(
                 profile  = profile,
                 username = prefs.fritzUsername,
-                password = prefs.fritzPassword
+                password = prefs.fritzPassword,
+                context  = this@ConnectionProfilesActivity
             ) { step ->
                 withContext(Dispatchers.Main) {
                     // Find or create the row for this step

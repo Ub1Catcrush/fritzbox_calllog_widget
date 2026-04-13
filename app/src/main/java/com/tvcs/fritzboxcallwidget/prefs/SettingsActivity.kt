@@ -154,7 +154,7 @@ class SettingsActivity : AppCompatActivity() {
             val ctx = requireContext()
             Toast.makeText(ctx, R.string.testing_connection, Toast.LENGTH_SHORT).show()
             lifecycleScope.launch {
-                val result = CallRepository(AppPreferences(ctx)).fetchCallLog()
+                val result = CallRepository(AppPreferences(ctx)).fetchCallLog(ctx)
                 val msg = if (result.isSuccess)
                     getString(R.string.connection_success, result.getOrDefault(emptyList()).size)
                 else

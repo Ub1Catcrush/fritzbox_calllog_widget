@@ -1,5 +1,6 @@
 package com.tvcs.fritzboxcallwidget.api
 
+import android.content.Context
 import android.util.Log
 import com.tvcs.fritzboxcallwidget.model.CallEntry
 import com.tvcs.fritzboxcallwidget.model.CallType
@@ -14,14 +15,21 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Fetches the call log using the configured connection profiles in priority order.
  *
- * Thread safety:
- *   - [cachedEntries] uses AtomicReference for safe concurrent read/write.
- *     @Volatile alone is insufficient because the check-then-set pattern
- *     (read null → fetch → write result) requires atomicity.
+ * Before attempting any network connection, the current [NetworkChecker.NetworkState]
+ * is evaluated:
+ *   - [NetworkChecker.NetworkState.NoNetwork]   → skip all profiles, return
+ *     cached data if available, otherwise failure.
+ *   - [NetworkChecker.NetworkState.Restricted]  → emit a warning via onProgress
+ *     and continue with the fetch; the restriction *may* block the connection
+ *     but we try anyway so the widget stays useful on a best-effort basis.
+ *   - [NetworkChecker.NetworkState.Available]   → proceed normally.
  *
- * Retry strategy: exponential backoff (2s / 4s / 8s) per profile.
- * Cache policy: errors never clear the cache — last successful result
- *   is always returned as a fallback.
+ * Thread safety: [cachedEntriesRef] uses AtomicReference for safe concurrent
+ * read/write (@Volatile alone is insufficient for check-then-set patterns).
+ *
+ * Retry strategy: exponential backoff (2 s / 4 s / 8 s) per profile.
+ * Cache policy: errors never clear the cache — last successful result is
+ * always returned as a fallback.
  */
 class CallRepository(private val prefs: AppPreferences) {
 
@@ -31,8 +39,6 @@ class CallRepository(private val prefs: AppPreferences) {
         private const val MAX_RETRIES   = 3
         private const val RETRY_BASE_MS = 2_000L
 
-        // AtomicReference instead of @Volatile field — ensures the reference
-        // itself is updated atomically (no torn writes on 32-bit JVMs).
         private val cachedEntriesRef = AtomicReference<List<CallEntry>?>(null)
     }
 
@@ -40,10 +46,39 @@ class CallRepository(private val prefs: AppPreferences) {
 
     data class Progress(val message: String, val isError: Boolean = false)
 
+    /**
+     * Fetches the call log.
+     *
+     * @param context Required for network state checks via [NetworkChecker].
+     * @param onProgress Called on the IO dispatcher with status updates.
+     */
     suspend fun fetchCallLog(
+        context: Context,
         onProgress: (Progress) -> Unit = {}
     ): Result<List<CallEntry>> = withContext(Dispatchers.IO) {
 
+        // ── Network pre-check ─────────────────────────────────────────────────
+        when (val netState = NetworkChecker.check(context)) {
+            is NetworkChecker.NetworkState.NoNetwork -> {
+                val msg = NetworkChecker.describeState(netState)
+                onProgress(Progress(msg, isError = true))
+                Log.w(TAG, "Fetch skipped: $msg")
+                return@withContext cachedEntriesRef.get()
+                    ?.let { Result.success(it) }
+                    ?: Result.failure(Exception(msg))
+            }
+            is NetworkChecker.NetworkState.Restricted -> {
+                // Warn but continue — the connection may still work even with
+                // Battery Saver or Data Saver active (e.g. LAN connection,
+                // app is whitelisted, or saver only affects metered networks).
+                val msg = NetworkChecker.describeState(netState)
+                onProgress(Progress("⚠ $msg — Verbindung wird trotzdem versucht…", isError = true))
+                Log.w(TAG, "Network restricted: $msg — attempting fetch anyway")
+            }
+            is NetworkChecker.NetworkState.Available -> { /* normal path */ }
+        }
+
+        // ── Profile iteration ─────────────────────────────────────────────────
         val profiles = prefs.getOrderedProfiles().filter { it.enabled }
 
         if (profiles.isEmpty()) {
@@ -66,7 +101,6 @@ class CallRepository(private val prefs: AppPreferences) {
 
             onProgress(Progress("Verbinde mit ${profile.displayName} (${profile.host})…"))
 
-//            val result = fetchWithoutRetry(profile, onProgress)
             val result = fetchWithRetry(profile, onProgress)
             if (result.isSuccess) {
                 val entries = result.getOrThrow()
@@ -88,37 +122,9 @@ class CallRepository(private val prefs: AppPreferences) {
                 "Alle Verbindungen fehlgeschlagen — zeige zuletzt geladene Daten",
                 isError = true
             ))
-            // Return success so the widget shows the cache; caller sees isError via onProgress
             Result.failure(lastError ?: Exception("Alle Verbindungsversuche fehlgeschlagen"))
         } else {
             Result.failure(lastError ?: Exception("Alle Verbindungsversuche fehlgeschlagen"))
-        }
-    }
-
-    private suspend fun fetchWithoutRetry(
-        profile: ConnectionProfile,
-        onProgress: (Progress) -> Unit
-    ): Result<List<CallEntry>> {
-        return try {
-            // Initialer Status für die UI
-            onProgress(Progress("${profile.displayName}: Verbinde...", isError = false))
-
-            val client = FritzBoxClient(profile, prefs.fritzUsername, prefs.fritzPassword)
-            val rawEntries = client.getCallList()
-
-            val entries = rawEntries.mapNotNull { raw ->
-                try {
-                    mapEntry(raw, prefs.phonePrefix)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Überpringe unlesbaren Eintrag: $raw", e)
-                    null
-                }
-            }.sortedByDescending { it.date }
-
-            Result.success(entries)
-        } catch (e: Exception) {
-            Log.e(TAG, "Fehler beim Abrufen von ${profile.host}: ${e.message}")
-            Result.failure(e)
         }
     }
 
@@ -144,7 +150,7 @@ class CallRepository(private val prefs: AppPreferences) {
                 lastError = e
                 val isLast = attempt == MAX_RETRIES - 1
                 if (!isLast) {
-                    val delayMs = RETRY_BASE_MS * (1L shl attempt) // 2s, 4s, 8s
+                    val delayMs = RETRY_BASE_MS * (1L shl attempt)
                     Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES on ${profile.host} failed: ${e.message}")
                     onProgress(Progress(
                         "${profile.displayName}: Versuch ${attempt + 1}/$MAX_RETRIES — " +
@@ -177,7 +183,6 @@ class CallRepository(private val prefs: AppPreferences) {
         }
         val rawNumber = if (type == CallType.OUTGOING && raw.called.isNotBlank())
             raw.called else raw.caller
-
         return CallEntry(
             date   = date,
             type   = type,

@@ -92,4 +92,11 @@
     <string name="check_result_ok">Alle Prüfungen bestanden.</string>
     <string name="check_result_failed">%d Prüfung(en) fehlgeschlagen.</string>
     <string name="check_result_warning">%d Warnung(en).</string>
+    <string name="network_status">Netzwerkstatus</string>
+    <string name="network_available">Netzwerk verfügbar</string>
+    <string name="network_no_network">Kein Netzwerk — Gerät ist offline oder im Flugmodus</string>
+    <string name="network_battery_saver">Energiesparmodus aktiv — Hintergrundverbindungen können eingeschränkt sein</string>
+    <string name="network_data_saver">Datensparmodus aktiv — Hintergrunddaten können gesperrt sein</string>
+    <string name="network_battery_data_saver">Energie- und Datensparmodus aktiv — Hintergrundverbindungen eingeschränkt</string>
+    <string name="network_restricted_hint">Verbindung wird trotzdem versucht</string>
 </resources>

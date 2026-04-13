@@ -92,4 +92,11 @@
     <string name="check_result_ok">Tous les tests réussis.</string>
     <string name="check_result_failed">%d test(s) échoué(s).</string>
     <string name="check_result_warning">%d avertissement(s).</string>
+    <string name="network_status">État du réseau</string>
+    <string name="network_available">Réseau disponible</string>
+    <string name="network_no_network">Pas de réseau — l\'appareil est hors ligne ou en mode avion</string>
+    <string name="network_battery_saver">Économie de batterie active — les connexions en arrière-plan peuvent être limitées</string>
+    <string name="network_data_saver">Économie de données active — les données en arrière-plan peuvent être bloquées</string>
+    <string name="network_battery_data_saver">Économies de batterie et de données actives — connexions en arrière-plan limitées</string>
+    <string name="network_restricted_hint">La connexion sera tentée quand même</string>
 </resources>

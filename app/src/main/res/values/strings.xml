@@ -102,4 +102,11 @@
     <string name="check_result_ok">All checks passed.</string>
     <string name="check_result_failed">%d check(s) failed.</string>
     <string name="check_result_warning">%d warning(s).</string>
+    <string name="network_status">Network status</string>
+    <string name="network_available">Network available</string>
+    <string name="network_no_network">No network — device is offline or in flight mode</string>
+    <string name="network_battery_saver">Battery saver active — background connections may be restricted</string>
+    <string name="network_data_saver">Data saver active — background data may be blocked</string>
+    <string name="network_battery_data_saver">Battery saver and data saver active — background connections restricted</string>
+    <string name="network_restricted_hint">Connection will be attempted anyway</string>
 </resources>
