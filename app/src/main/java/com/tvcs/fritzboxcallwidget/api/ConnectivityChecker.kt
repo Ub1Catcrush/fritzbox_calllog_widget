@@ -195,7 +195,7 @@ object ConnectivityChecker {
         running(labelDesc)
         val descBody = runCatching {
             client.newCall(Request.Builder().url("$baseUrl/tr64desc.xml").build())
-                .execute().use { r -> Pair(r.code, r.body.string() ?: "") }
+                .execute().use { r -> Pair(r.code, r.body.string()) }
         }.getOrElse { return }
         when {
             descBody.first == 404             -> { fail(labelDesc, "tr64desc.xml nicht gefunden — falscher Port?"); return }
@@ -233,7 +233,7 @@ object ConnectivityChecker {
         runCatching {
             client.newCall(Request.Builder().url(callListUrl).build())
                 .execute().use { r ->
-                    val body = r.body.string() ?: ""
+                    val body = r.body.string()
                     val count = body.split("<Call>").size - 1
                     ok(labelList, "$count Anrufe gefunden")
                 }
@@ -257,7 +257,7 @@ object ConnectivityChecker {
             client.newCall(Request.Builder().url("$baseUrl/login_sid.lua?version=1").build())
                 .execute().use { r ->
                     if (!r.isSuccessful) throw Exception("HTTP ${r.code}")
-                    r.body.string() ?: throw Exception("Leere Antwort")
+                    r.body.string()
                 }
         }.getOrElse { e -> fail(labelLogin, e.message ?: "Nicht erreichbar"); return }
 
@@ -306,7 +306,7 @@ object ConnectivityChecker {
 
             val authXml = runCatching {
                 client.newCall(Request.Builder().url(authUrl).build())
-                    .execute().use { r -> r.body.string() ?: "" }
+                    .execute().use { r -> r.body.string() }
             }.getOrElse { e -> fail(labelSid, e.message ?: "Fehler"); return }
 
             val newSid = authXml.substringAfter("<SID>").substringBefore("</SID>").trim()
@@ -337,7 +337,7 @@ object ConnectivityChecker {
         runCatching {
             client.newCall(Request.Builder().url(csvUrl).build()).execute().use { r ->
                 if (!r.isSuccessful) throw Exception("HTTP ${r.code}")
-                val count = (r.body.string() ?: "").lines()
+                val count = r.body.string().lines()
                     .count { it.isNotBlank() } - 1 // minus header
                 ok(labelList, "$count Anrufe gefunden")
             }
@@ -423,7 +423,7 @@ object ConnectivityChecker {
                 .build()
             resp = client.newCall(req).execute()
         }
-        val result = resp.body.string() ?: throw Exception("Leere SOAP-Antwort")
+        val result = resp.body.string()
         if (!resp.isSuccessful) throw Exception("SOAP ${resp.code}: $result")
         return result
     }
