@@ -1,4 +1,4 @@
-# FritzBox CallLog Widget für Android
+# FritzBox Anruflisten-Widget für Android
 
 Ein anpassbares Android-Homescreen-Widget, das das Anrufprotokoll deiner FRITZ!Box über TR-064 oder die MyFRITZ-Session-API abruft und als scrollbare Tabelle anzeigt. Drei unabhängige Verbindungsprofile (LAN, Internet TR-064, Internet MyFRITZ) lassen sich priorisieren und einzeln ein- oder ausschalten – das Widget bleibt auch beim Wechsel zwischen WLAN und mobilem Netz erreichbar.
 
