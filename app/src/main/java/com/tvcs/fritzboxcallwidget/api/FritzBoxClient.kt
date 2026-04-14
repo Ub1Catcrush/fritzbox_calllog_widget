@@ -116,8 +116,7 @@ class FritzBoxClient(
             httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
                 if (!response.isSuccessful)
                     throw FritzBoxException("HTTP ${response.code} beim Abruf der Anrufliste (MyFRITZ)")
-                val body = response.body?.string()
-                    ?: throw FritzBoxException("Leere Antwort bei Anrufliste (MyFRITZ)")
+                val body = response.body.string()
                 parseCallListCsv(body)
             }
         }
@@ -135,7 +134,7 @@ class FritzBoxClient(
         ).execute().use { r ->
             if (!r.isSuccessful)
                 throw FritzBoxException("HTTP ${r.code} beim Login-Challenge-Request")
-            r.body?.string() ?: throw FritzBoxException("Leere Challenge-Antwort von ${profile.host}")
+            r.body.string()
         }
 
         val currentSid = challengeXml.extractXmlTag("SID")
@@ -169,7 +168,7 @@ class FritzBoxClient(
         ).execute().use { r ->
             if (!r.isSuccessful)
                 throw FritzBoxException("HTTP ${r.code} bei Login-Authentifizierung")
-            r.body?.string() ?: throw FritzBoxException("Leere Auth-Antwort von ${profile.host}")
+            r.body.string()
         }
 
         val sid = authXml.extractXmlTag("SID")
@@ -233,8 +232,7 @@ class FritzBoxClient(
 
         return wrapIo("TR-064 call list download") {
             httpClient.newCall(Request.Builder().url(callListUrl).build()).execute().use { r ->
-                val body = r.body?.string()
-                    ?: throw FritzBoxException("Leere Antwort beim Abruf der Anrufliste")
+                val body = r.body.string()
                 if (!r.isSuccessful) throw FritzBoxException("HTTP ${r.code} beim Abruf der Anrufliste")
                 parseCallListXml(body)
             }
@@ -271,8 +269,7 @@ class FritzBoxClient(
                 response = httpClient.newCall(request).execute()
             }
 
-            val responseBody = response.body?.string()
-                ?: throw FritzBoxException("Leere SOAP-Antwort von ${profile.host}")
+            val responseBody = response.body.string()
             if (!response.isSuccessful)
                 throw FritzBoxException("SOAP-Fehler ${response.code}: $responseBody")
             responseBody
