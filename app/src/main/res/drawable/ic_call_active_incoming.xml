@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Active incoming call (in progress): blue arrow + filled circle indicator -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Arrow shaft: top-right → bottom-left (same as incoming) -->
+    <path
+        android:strokeColor="#FF1976D2"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M17,7 L7,17" />
+    <!-- Arrowhead at bottom-left -->
+    <path
+        android:strokeColor="#FF1976D2"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M7,12 L7,17 L12,17" />
+    <!-- Small filled circle top-right = "active" indicator -->
+    <path
+        android:fillColor="#FF1976D2"
+        android:pathData="M18,4 C19.1,4 20,4.9 20,6 C20,7.1 19.1,8 18,8 C16.9,8 16,7.1 16,6 C16,4.9 16.9,4 18,4 Z" />
+</vector>

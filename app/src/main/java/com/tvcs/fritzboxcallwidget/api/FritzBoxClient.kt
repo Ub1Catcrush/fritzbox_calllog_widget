@@ -301,12 +301,14 @@ class FritzBoxClient(
         return (0 until calls.length).map { i ->
             val call = calls.item(i) as Element
             FritzCallEntry(
-                type     = call.getChildText("Type").toIntOrNull() ?: 0,
-                date     = call.getChildText("Date"),
-                name     = call.getChildText("Name"),
-                duration = call.getChildText("Duration"),
-                caller   = call.getChildText("Caller"),
-                called   = call.getChildText("Called")
+                type       = call.getChildText("Type").toIntOrNull() ?: 0,
+                date       = call.getChildText("Date"),
+                name       = call.getChildText("Name"),
+                duration   = call.getChildText("Duration"),
+                caller     = call.getChildText("Caller"),
+                called     = call.getChildText("Called"),
+                port       = call.getChildText("Port").toIntOrNull() ?: -1,
+                numbertype = call.getChildText("Numbertype").lowercase()
             )
         }
     }
@@ -414,7 +416,11 @@ data class FritzCallEntry(
     val name: String,
     val duration: String,
     val caller: String,
-    val called: String
+    val called: String,
+    /** Port ≥ 40 → internal answering machine recorded the call. */
+    val port: Int = -1,
+    /** Numbertype from FritzBox XML, e.g. "fax", "isdn", "sip". */
+    val numbertype: String = ""
 )
 
 class FritzBoxException(message: String, cause: Throwable? = null) : Exception(message, cause)

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fax sent: document with upward arrow (teal lighter) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Document outline -->
+    <path
+        android:strokeColor="#FF4DB6AC"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M6,3 L15,3 L18,6 L18,21 L6,21 Z" />
+    <!-- Folded corner -->
+    <path
+        android:strokeColor="#FF4DB6AC"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M15,3 L15,6 L18,6" />
+    <!-- Up arrow shaft -->
+    <path
+        android:strokeColor="#FF4DB6AC"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12,15 L12,8" />
+    <!-- Arrow head -->
+    <path
+        android:strokeColor="#FF4DB6AC"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M9,10.5 L12,7.5 L15,10.5" />
+</vector>

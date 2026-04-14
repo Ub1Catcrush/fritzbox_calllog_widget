@@ -99,4 +99,13 @@
     <string name="network_data_saver">Ahorro de datos activo — los datos en segundo plano pueden estar bloqueados</string>
     <string name="network_battery_data_saver">Ahorro de batería y datos activos — conexiones en segundo plano limitadas</string>
     <string name="network_restricted_hint">Se intentará la conexión de todas formas</string>
+    <string name="call_type_incoming">Entrante</string>
+    <string name="call_type_outgoing">Saliente</string>
+    <string name="call_type_missed">Perdida</string>
+    <string name="call_type_blocked">Bloqueada</string>
+    <string name="call_type_voicemail">Buzón de voz</string>
+    <string name="call_type_fax_received">Fax recibido</string>
+    <string name="call_type_fax_sent">Fax enviado</string>
+    <string name="call_type_active_incoming">Llamada activa (entrante)</string>
+    <string name="call_type_active_outgoing">Llamada activa (saliente)</string>
 </resources>

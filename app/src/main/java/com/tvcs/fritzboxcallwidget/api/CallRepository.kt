@@ -169,11 +169,34 @@ class CallRepository(private val prefs: AppPreferences) {
     // ── Entry mapping ─────────────────────────────────────────────────────────
 
     private fun mapEntry(raw: FritzCallEntry, prefix: String): CallEntry {
+        // Determine CallType from FritzBox type code, port, and numbertype.
+        //
+        // Type codes:
+        //   1  = Incoming answered
+        //   2  = Missed
+        //   3  = Outgoing
+        //   4  = Incoming answered (active call deflection)
+        //   9  = Active incoming call (still in progress — rarely in history)
+        //  10  = Rejected / blocked by call-block rule
+        //  11  = Active outgoing call (still in progress — rarely in history)
+        //
+        // Port ≥ 40: FritzBox internal answering machine recorded the call.
+        // Numbertype "fax": fax transmission, not a voice call.
+        val isFax = raw.numbertype == "fax"
+        val isAB  = raw.port >= 40                 // AB port starts at 40 by default
+
         val type = when (raw.type) {
-            1, 4  -> CallType.INCOMING
-            2, 10 -> CallType.MISSED
-            3     -> CallType.OUTGOING
-            else  -> CallType.INCOMING
+            1, 4 -> when {
+                isFax -> CallType.FAX_RECEIVED
+                isAB  -> CallType.VOICEMAIL        // caller left a message on AB
+                else  -> CallType.INCOMING
+            }
+            2    -> CallType.MISSED
+            3    -> if (isFax) CallType.FAX_SENT else CallType.OUTGOING
+            9    -> CallType.ACTIVE_INCOMING
+            10   -> CallType.BLOCKED
+            11   -> CallType.ACTIVE_OUTGOING
+            else -> CallType.INCOMING              // unknown — treat as incoming
         }
         val date = try {
             LocalDateTime.parse(raw.date, FRITZ_DATE_FORMAT)

@@ -109,4 +109,13 @@
     <string name="network_data_saver">Data saver active — background data may be blocked</string>
     <string name="network_battery_data_saver">Battery saver and data saver active — background connections restricted</string>
     <string name="network_restricted_hint">Connection will be attempted anyway</string>
+    <string name="call_type_incoming">Incoming</string>
+    <string name="call_type_outgoing">Outgoing</string>
+    <string name="call_type_missed">Missed</string>
+    <string name="call_type_blocked">Blocked</string>
+    <string name="call_type_voicemail">Voicemail</string>
+    <string name="call_type_fax_received">Fax received</string>
+    <string name="call_type_fax_sent">Fax sent</string>
+    <string name="call_type_active_incoming">Active call (incoming)</string>
+    <string name="call_type_active_outgoing">Active call (outgoing)</string>
 </resources>

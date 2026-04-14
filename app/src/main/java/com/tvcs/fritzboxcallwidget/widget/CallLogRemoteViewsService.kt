@@ -84,9 +84,15 @@ private class CallLogViewsFactory : RemoteViewsService.RemoteViewsFactory {
 
         // Call type icon
         val iconRes = when (entry.type) {
-            CallType.INCOMING -> R.drawable.ic_call_incoming
-            CallType.OUTGOING -> R.drawable.ic_call_outgoing
-            CallType.MISSED   -> R.drawable.ic_call_missed
+            CallType.INCOMING         -> R.drawable.ic_call_incoming
+            CallType.OUTGOING         -> R.drawable.ic_call_outgoing
+            CallType.MISSED           -> R.drawable.ic_call_missed
+            CallType.BLOCKED          -> R.drawable.ic_call_blocked
+            CallType.VOICEMAIL        -> R.drawable.ic_call_voicemail
+            CallType.FAX_RECEIVED     -> R.drawable.ic_call_fax_received
+            CallType.FAX_SENT         -> R.drawable.ic_call_fax_sent
+            CallType.ACTIVE_INCOMING  -> R.drawable.ic_call_active_incoming
+            CallType.ACTIVE_OUTGOING  -> R.drawable.ic_call_active_outgoing
         }
         views.setImageViewResource(R.id.iv_call_type, iconRes)
 

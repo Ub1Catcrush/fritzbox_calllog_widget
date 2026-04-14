@@ -99,4 +99,13 @@
     <string name="network_data_saver">Datensparmodus aktiv — Hintergrunddaten können gesperrt sein</string>
     <string name="network_battery_data_saver">Energie- und Datensparmodus aktiv — Hintergrundverbindungen eingeschränkt</string>
     <string name="network_restricted_hint">Verbindung wird trotzdem versucht</string>
+    <string name="call_type_incoming">Eingehend</string>
+    <string name="call_type_outgoing">Ausgehend</string>
+    <string name="call_type_missed">Verpasst</string>
+    <string name="call_type_blocked">Blockiert</string>
+    <string name="call_type_voicemail">Anrufbeantworter</string>
+    <string name="call_type_fax_received">Fax empfangen</string>
+    <string name="call_type_fax_sent">Fax gesendet</string>
+    <string name="call_type_active_incoming">Aktiver Anruf (eingehend)</string>
+    <string name="call_type_active_outgoing">Aktiver Anruf (ausgehend)</string>
 </resources>

@@ -256,9 +256,15 @@ class CallLogWidget : AppWidgetProvider() {
             row.setTextViewTextSize(R.id.tv_time, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
             row.setTextViewTextSize(R.id.tv_name, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
             row.setImageViewResource(R.id.iv_call_type, when (entry.type) {
-                CallType.INCOMING -> R.drawable.ic_call_incoming
-                CallType.OUTGOING -> R.drawable.ic_call_outgoing
-                CallType.MISSED   -> R.drawable.ic_call_missed
+                CallType.INCOMING         -> R.drawable.ic_call_incoming
+                CallType.OUTGOING         -> R.drawable.ic_call_outgoing
+                CallType.MISSED           -> R.drawable.ic_call_missed
+                CallType.BLOCKED          -> R.drawable.ic_call_blocked
+                CallType.VOICEMAIL        -> R.drawable.ic_call_voicemail
+                CallType.FAX_RECEIVED     -> R.drawable.ic_call_fax_received
+                CallType.FAX_SENT         -> R.drawable.ic_call_fax_sent
+                CallType.ACTIVE_INCOMING  -> R.drawable.ic_call_active_incoming
+                CallType.ACTIVE_OUTGOING  -> R.drawable.ic_call_active_outgoing
             })
             row.setInt(R.id.row_root, "setBackgroundColor",
                 if (index % 2 == 0) colors.rowEven else colors.rowOdd)

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Voicemail / Answering machine: microphone (orange) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Mic body -->
+    <path
+        android:strokeColor="#FFF57C00"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12,4 C10.3,4 9,5.3 9,7 L9,13 C9,14.7 10.3,16 12,16 C13.7,16 15,14.7 15,13 L15,7 C15,5.3 13.7,4 12,4 Z" />
+    <!-- Stand / arm -->
+    <path
+        android:strokeColor="#FFF57C00"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M6.5,12.5 C6.5,15.5 9,18 12,18 C15,18 17.5,15.5 17.5,12.5" />
+    <!-- Vertical line down -->
+    <path
+        android:strokeColor="#FFF57C00"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M12,18 L12,21" />
+    <!-- Base -->
+    <path
+        android:strokeColor="#FFF57C00"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M9,21 L15,21" />
+</vector>
