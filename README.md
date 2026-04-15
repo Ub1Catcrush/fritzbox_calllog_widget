@@ -1,4 +1,4 @@
-# FritzBox CallLog Widget für Android
+# FritzBox Anruflisten-Widget für Android
 
 [🇬🇧 English](docs/README.en.md) · [🇫🇷 Français](docs/README.fr.md) · [🇪🇸 Español](docs/README.es.md)
 
