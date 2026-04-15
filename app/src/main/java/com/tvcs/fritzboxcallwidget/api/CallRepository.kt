@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
+import com.tvcs.fritzboxcallwidget.api.PhonebookRepository
 
 /**
  * Fetches the call log using the configured connection profiles in priority order.
@@ -104,9 +105,24 @@ class CallRepository(private val prefs: AppPreferences) {
             val result = fetchWithRetry(profile, onProgress)
             if (result.isSuccess) {
                 val entries = result.getOrThrow()
-                cachedEntriesRef.set(entries)
-                onProgress(Progress("${entries.size} Anrufe geladen von ${profile.displayName}"))
-                return@withContext Result.success(entries)
+                // Optionally enrich unknown entries with FritzBox phonebook names
+                val enriched = if (prefs.phonebookLookupEnabled) {
+                    entries.map { e ->
+                        if (e.name == null) {
+                            val name = PhonebookRepository.lookupName(e.number, prefs)
+                            if (name != null) e.copy(name = name) else e
+                        } else e
+                    }
+                } else entries
+
+                // Apply call type filter
+                val filtered = prefs.activeCallTypeFilter()
+                    ?.let { allowed -> enriched.filter { it.type in allowed } }
+                    ?: enriched
+
+                cachedEntriesRef.set(enriched)  // cache unfiltered for widget resize
+                onProgress(Progress("${filtered.size} Anrufe geladen von ${profile.displayName}"))
+                return@withContext Result.success(filtered)
             }
 
             lastError = result.exceptionOrNull()
@@ -168,7 +184,7 @@ class CallRepository(private val prefs: AppPreferences) {
 
     // ── Entry mapping ─────────────────────────────────────────────────────────
 
-    private fun mapEntry(raw: FritzCallEntry, prefix: String): CallEntry {
+    private fun mapEntry(raw: FritzBoxClient.FritzCallEntry, prefix: String): CallEntry {
         // Determine CallType from FritzBox type code, port, and numbertype.
         //
         // Type codes:

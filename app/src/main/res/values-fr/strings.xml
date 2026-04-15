@@ -108,4 +108,33 @@
     <string name="call_type_fax_sent">Fax envoyé</string>
     <string name="call_type_active_incoming">Appel actif (entrant)</string>
     <string name="call_type_active_outgoing">Appel actif (sortant)</string>
+    <string name="pref_category_advanced">Fonctionnalités avancées</string>
+    <string name="pref_exact_alarm_title">⚠ Permission d\'alarme exacte manquante</string>
+    <string name="pref_exact_alarm_summary">Appuyer pour ouvrir les paramètres système. Sans cette permission, les intervalles de rafraîchissement peuvent être imprécis.</string>
+    <string name="pref_show_duration_title">Afficher la durée d\'appel</string>
+    <string name="pref_show_duration_summary">Afficher la durée après le nom/numéro (ex. 2:35)</string>
+    <string name="pref_show_last_updated_title">Afficher la dernière mise à jour</string>
+    <string name="pref_show_last_updated_summary">Afficher l\'heure du dernier rafraîchissement réussi dans l\'en-tête</string>
+    <string name="last_updated">Mis à jour : %s</string>
+    <string name="pref_call_filter_title">Filtre d\'appels</string>
+    <string name="call_filter_all">Tous les appels</string>
+    <string name="call_filter_fax">Fax</string>
+    <string name="pref_click_to_dial_title">Cliquer pour composer via FritzBox</string>
+    <string name="pref_click_to_dial_summary">La FritzBox appelle d\'abord votre téléphone, puis compose le numéro sélectionné (TR-064 requis)</string>
+    <string name="pref_click_to_dial_ext_title">Votre numéro de poste</string>
+    <string name="pref_click_to_dial_ext_summary">Poste interne que la FritzBox doit appeler (ex. **610). Vide = ligne par défaut.</string>
+    <string name="click_to_dial_initiated">Appel de %s via FritzBox en cours…</string>
+    <string name="click_to_dial_failed">Échec du clic-pour-appeler — ouverture de l\'application téléphone</string>
+    <string name="click_to_dial_no_profile">Aucun profil TR-064 configuré — ouverture de l\'application téléphone</string>
+    <string name="pref_phonebook_lookup_title">Répertoire FritzBox</string>
+    <string name="pref_phonebook_lookup_summary">Rechercher les numéros inconnus dans le répertoire FritzBox (TR-064 uniquement)</string>
+    <string name="pref_missed_notifications_title">Notifications d\'appels manqués</string>
+    <string name="pref_missed_notifications_summary">Vérifier les nouveaux appels manqués en arrière-plan et envoyer une notification (toutes les 15 min)</string>
+    <string name="notif_channel_name">Appels manqués</string>
+    <string name="notif_channel_desc">Notifications pour les nouveaux appels manqués de la FritzBox</string>
+    <string name="notif_permission_denied">Permission de notification refusée — notifications désactivées</string>
+    <plurals name="notif_missed_title">
+        <item quantity="one">%d appel manqué</item>
+        <item quantity="other">%d appels manqués</item>
+    </plurals>
 </resources>

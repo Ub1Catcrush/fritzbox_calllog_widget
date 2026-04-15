@@ -77,6 +77,80 @@
         <com.tvcs.fritzboxcallwidget.prefs.ColorPickerPreference android:key="pref_color_error_dark"           android:title="@string/pref_color_error"           app:iconSpaceReserved="false"/>
     </PreferenceCategory>
 
+
+    <!-- Advanced / optional features -->
+    <PreferenceCategory android:title="@string/pref_category_advanced" app:iconSpaceReserved="false">
+
+        <!-- Exact alarm permission banner (shown only when permission missing on Android 12+) -->
+        <Preference
+            android:key="pref_exact_alarm_hint"
+            android:title="@string/pref_exact_alarm_title"
+            android:summary="@string/pref_exact_alarm_summary"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Show duration after name/number -->
+        <SwitchPreferenceCompat
+            android:key="pref_show_duration"
+            android:title="@string/pref_show_duration_title"
+            android:summary="@string/pref_show_duration_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Show last-updated timestamp in header -->
+        <SwitchPreferenceCompat
+            android:key="pref_show_last_updated"
+            android:title="@string/pref_show_last_updated_title"
+            android:summary="@string/pref_show_last_updated_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Call type filter (tapping widget title also cycles through these) -->
+        <ListPreference
+            android:key="pref_call_filter"
+            android:title="@string/pref_call_filter_title"
+            android:summary="%s"
+            android:entries="@array/call_filter_entries"
+            android:entryValues="@array/call_filter_values"
+            android:defaultValue="all"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Click-to-Dial via FritzBox TR-064 -->
+        <SwitchPreferenceCompat
+            android:key="pref_click_to_dial"
+            android:title="@string/pref_click_to_dial_title"
+            android:summary="@string/pref_click_to_dial_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Extension/number to call back on when using Click-to-Dial -->
+        <EditTextPreference
+            android:key="pref_click_to_dial_ext"
+            android:title="@string/pref_click_to_dial_ext_title"
+            android:summary="@string/pref_click_to_dial_ext_summary"
+            android:defaultValue=""
+            android:inputType="phone"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
+        <!-- FritzBox phonebook lookup for unknown numbers -->
+        <SwitchPreferenceCompat
+            android:key="pref_phonebook_lookup"
+            android:title="@string/pref_phonebook_lookup_title"
+            android:summary="@string/pref_phonebook_lookup_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+        <!-- Missed call notifications (WorkManager background check) -->
+        <SwitchPreferenceCompat
+            android:key="pref_missed_notifications"
+            android:title="@string/pref_missed_notifications_title"
+            android:summary="@string/pref_missed_notifications_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false"/>
+
+    </PreferenceCategory>
+
     <!-- Reset -->
     <PreferenceCategory app:iconSpaceReserved="false">
         <Preference android:key="pref_reset_colors" android:title="@string/pref_reset_colors_title" android:summary="@string/pref_reset_colors_summary" app:iconSpaceReserved="false"/>

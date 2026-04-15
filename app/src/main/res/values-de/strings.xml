@@ -108,4 +108,33 @@
     <string name="call_type_fax_sent">Fax gesendet</string>
     <string name="call_type_active_incoming">Aktiver Anruf (eingehend)</string>
     <string name="call_type_active_outgoing">Aktiver Anruf (ausgehend)</string>
+    <string name="pref_category_advanced">Erweiterte Funktionen</string>
+    <string name="pref_exact_alarm_title">⚠ Berechtigung für genaue Alarme fehlt</string>
+    <string name="pref_exact_alarm_summary">Tippen zum Öffnen der Systemeinstellungen. Ohne diese Berechtigung können Aktualisierungsintervalle ungenau sein.</string>
+    <string name="pref_show_duration_title">Gesprächsdauer anzeigen</string>
+    <string name="pref_show_duration_summary">Dauer hinter Name/Nummer anzeigen (z.B. 2:35)</string>
+    <string name="pref_show_last_updated_title">Letzte Aktualisierung anzeigen</string>
+    <string name="pref_show_last_updated_summary">Zeitstempel der letzten erfolgreichen Aktualisierung im Header anzeigen</string>
+    <string name="last_updated">Aktualisiert: %s</string>
+    <string name="pref_call_filter_title">Anruffilter</string>
+    <string name="call_filter_all">Alle Anrufe</string>
+    <string name="call_filter_fax">Fax</string>
+    <string name="pref_click_to_dial_title">Click-to-Dial über FritzBox</string>
+    <string name="pref_click_to_dial_summary">FritzBox ruft zuerst dein Telefon an, dann die gewählte Nummer (erfordert TR-064)</string>
+    <string name="pref_click_to_dial_ext_title">Deine Nebenstelle</string>
+    <string name="pref_click_to_dial_ext_summary">Interne Nebenstelle, die die FritzBox anrufen soll (z.B. **610). Leer = Standardleitung.</string>
+    <string name="click_to_dial_initiated">%s wird über FritzBox angerufen…</string>
+    <string name="click_to_dial_failed">Click-to-Dial fehlgeschlagen — Telefon-App wird geöffnet</string>
+    <string name="click_to_dial_no_profile">Kein TR-064-Profil konfiguriert — Telefon-App wird geöffnet</string>
+    <string name="pref_phonebook_lookup_title">FritzBox-Telefonbuch</string>
+    <string name="pref_phonebook_lookup_summary">Unbekannte Nummern im FritzBox-Telefonbuch nachschlagen (nur TR-064)</string>
+    <string name="pref_missed_notifications_title">Benachrichtigungen bei verpassten Anrufen</string>
+    <string name="pref_missed_notifications_summary">Im Hintergrund auf neue verpasste Anrufe prüfen und benachrichtigen (alle 15 Min.)</string>
+    <string name="notif_channel_name">Verpasste Anrufe</string>
+    <string name="notif_channel_desc">Benachrichtigungen über neue verpasste Anrufe der FritzBox</string>
+    <string name="notif_permission_denied">Benachrichtigungsberechtigung verweigert — Benachrichtigungen deaktiviert</string>
+    <plurals name="notif_missed_title">
+        <item quantity="one">%d verpasster Anruf</item>
+        <item quantity="other">%d verpasste Anrufe</item>
+    </plurals>
 </resources>

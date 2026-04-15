@@ -63,4 +63,25 @@
         <item>14</item>
         <item>16</item>
     </string-array>
+
+    <!-- Call type filter for widget -->
+    <string-array name="call_filter_entries">
+        <item>@string/call_filter_all</item>
+        <item>@string/call_type_missed</item>
+        <item>@string/call_type_incoming</item>
+        <item>@string/call_type_outgoing</item>
+        <item>@string/call_type_blocked</item>
+        <item>@string/call_type_voicemail</item>
+        <item>@string/call_filter_fax</item>
+    </string-array>
+    <string-array name="call_filter_values">
+        <item>all</item>
+        <item>missed</item>
+        <item>incoming</item>
+        <item>outgoing</item>
+        <item>blocked</item>
+        <item>voicemail</item>
+        <item>fax</item>
+    </string-array>
+
 </resources>

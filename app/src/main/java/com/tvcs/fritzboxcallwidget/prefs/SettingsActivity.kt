@@ -139,9 +139,103 @@ class SettingsActivity : AppCompatActivity() {
                     true
                 }
 
-                        findPreference<Preference>("pref_test_connection")
+            findPreference<Preference>("pref_test_connection")
                 ?.setOnPreferenceClickListener { testConnection(); true }
+
+            // ── Optional features ─────────────────────────────────────────────
+
+            listOf(
+                AppPreferences.KEY_SHOW_DURATION,
+                AppPreferences.KEY_SHOW_LAST_UPDATED,
+                AppPreferences.KEY_CALL_FILTER,
+                AppPreferences.KEY_CLICK_TO_DIAL,
+            ).forEach { key ->
+                findPreference<Preference>(key)
+                    ?.setOnPreferenceChangeListener { _, _ -> scheduleWidgetRefresh(); true }
+            }
+
+            // Click-to-Dial extension: visible only when click_to_dial is on
+            val extPref = findPreference<Preference>(AppPreferences.KEY_CLICK_TO_DIAL_EXT)
+            extPref?.isVisible = AppPreferences(ctx).clickToDialEnabled
+            findPreference<androidx.preference.SwitchPreferenceCompat>(
+                AppPreferences.KEY_CLICK_TO_DIAL)
+                ?.setOnPreferenceChangeListener { _, v ->
+                    extPref?.isVisible = v as Boolean
+                    scheduleWidgetRefresh(); true
+                }
+
+            // Phonebook lookup — invalidate cache on toggle
+            findPreference<Preference>(AppPreferences.KEY_PHONEBOOK_LOOKUP)
+                ?.setOnPreferenceChangeListener { _, _ ->
+                    com.tvcs.fritzboxcallwidget.api.PhonebookRepository.invalidate()
+                    scheduleWidgetRefresh(); true
+                }
+
+            // Missed call notifications — schedule/cancel WorkManager worker
+            findPreference<Preference>(AppPreferences.KEY_MISSED_NOTIFICATIONS)
+                ?.setOnPreferenceChangeListener { _, v ->
+                    if (v as Boolean) {
+                        requestNotificationPermissionIfNeeded()
+                        com.tvcs.fritzboxcallwidget.widget.MissedCallWorker.schedule(ctx)
+                    } else {
+                        com.tvcs.fritzboxcallwidget.widget.MissedCallWorker.cancel(ctx)
+                    }
+                    true
+                }
+
+            // Exact alarm permission banner
+            showExactAlarmBannerIfNeeded()
         }
+
+        private fun showExactAlarmBannerIfNeeded() {
+            val ctx = requireContext()
+            val pref = findPreference<Preference>("pref_exact_alarm_hint") ?: return
+            if (!com.tvcs.fritzboxcallwidget.widget.WidgetScheduler.canScheduleExactAlarms(ctx)) {
+                pref.isVisible = true
+                pref.setOnPreferenceClickListener {
+                    val intent = com.tvcs.fritzboxcallwidget.widget.WidgetScheduler
+                        .requestExactAlarmPermissionIntent(ctx)
+                    if (intent != null) startActivity(intent)
+                    true
+                }
+            } else {
+                pref.isVisible = false
+            }
+        }
+
+        private fun requestNotificationPermissionIfNeeded() {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                if (requireContext().checkSelfPermission(
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    requestPermissions(
+                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                        REQUEST_NOTIFICATION_PERMISSION
+                    )
+                }
+            }
+        }
+
+        override fun onRequestPermissionsResult(
+            requestCode: Int, permissions: Array<String>, grantResults: IntArray
+        ) {
+            if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+                val granted = grantResults.firstOrNull() ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (!granted) {
+                    // User denied — turn the switch back off
+                    AppPreferences(requireContext()).missedCallNotificationsEnabled = false
+                    findPreference<androidx.preference.SwitchPreferenceCompat>(
+                        AppPreferences.KEY_MISSED_NOTIFICATIONS)?.isChecked = false
+                    Toast.makeText(requireContext(),
+                        R.string.notif_permission_denied, Toast.LENGTH_LONG).show()
+                }
+            }
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        }
+
+        companion object { private const val REQUEST_NOTIFICATION_PERMISSION = 200 }
 
         private fun scheduleWidgetRefresh() {
             lifecycleScope.launch {

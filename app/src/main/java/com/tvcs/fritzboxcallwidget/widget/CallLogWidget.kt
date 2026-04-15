@@ -23,16 +23,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 class CallLogWidget : AppWidgetProvider() {
 
     companion object {
-        const val ACTION_REFRESH = "com.tvcs.fritzboxcallwidget.ACTION_REFRESH"
+        const val ACTION_REFRESH     = "com.tvcs.fritzboxcallwidget.ACTION_REFRESH"
+        const val ACTION_NEXT_FILTER = "com.tvcs.fritzboxcallwidget.ACTION_NEXT_FILTER"
 
-        // Singleton scope — one per process, not per-provider-instance.
-        // AppWidgetProvider is re-instantiated on every broadcast; a per-instance scope
-        // would leak running jobs when the provider is recreated mid-fetch.
+        /** Cycling order for the header filter button. */
+        private val FILTER_CYCLE = listOf(
+            "all", "missed", "incoming", "outgoing", "blocked", "voicemail", "fax"
+        )
+
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         fun triggerRefresh(context: Context) {
@@ -52,6 +56,8 @@ class CallLogWidget : AppWidgetProvider() {
             else PendingIntent.FLAG_UPDATE_CURRENT
     }
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         for (id in ids) showLoading(context, manager, id)
         fetchAndUpdate(context, manager, ids)
@@ -63,7 +69,9 @@ class CallLogWidget : AppWidgetProvider() {
         val prefs  = AppPreferences(context)
         val cached = CallRepository(prefs).getCachedEntries()
         if (cached != null) {
-            updateWidget(context, manager, id, State.Success(cached.take(prefs.maxEntries)), prefs)
+            val filtered = applyFilter(cached, prefs)
+            updateWidget(context, manager, id,
+                State.Success(filtered.take(prefs.maxEntries)), prefs)
         } else {
             fetchAndUpdate(context, manager, intArrayOf(id))
         }
@@ -71,27 +79,60 @@ class CallLogWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_REFRESH) {
-            val manager = AppWidgetManager.getInstance(context)
-            val ids = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
-                ?: manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
-            for (id in ids) showLoading(context, manager, id)
-            fetchAndUpdate(context, manager, ids)
+        val manager = AppWidgetManager.getInstance(context)
+        when (intent.action) {
+            ACTION_REFRESH -> {
+                val ids = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
+                    ?: manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
+                for (id in ids) showLoading(context, manager, id)
+                fetchAndUpdate(context, manager, ids)
+            }
+            ACTION_NEXT_FILTER -> {
+                // Cycle to next filter value and refresh display from cache
+                val prefs   = AppPreferences(context)
+                val current = prefs.callFilter
+                val next    = FILTER_CYCLE[(FILTER_CYCLE.indexOf(current) + 1) % FILTER_CYCLE.size]
+                prefs.callFilter = next
+                val ids = manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
+                val cached = CallRepository(prefs).getCachedEntries()
+                if (cached != null) {
+                    val filtered = applyFilter(cached, prefs)
+                    for (id in ids)
+                        updateWidget(context, manager, id,
+                            State.Success(filtered.take(prefs.maxEntries)), prefs)
+                } else {
+                    fetchAndUpdate(context, manager, ids)
+                }
+            }
         }
     }
 
-    override fun onEnabled(context: Context)  { WidgetScheduler.schedule(context) }
-    override fun onDisabled(context: Context) { WidgetScheduler.cancel(context) }
+    override fun onEnabled(context: Context)  {
+        WidgetScheduler.schedule(context)
+        MissedCallWorker.createNotificationChannel(context)
+    }
+    override fun onDisabled(context: Context) {
+        WidgetScheduler.cancel(context)
+        MissedCallWorker.cancel(context)
+    }
 
     // ── State ─────────────────────────────────────────────────────────────────
 
     private sealed class State {
         object Loading : State()
         data class Error(val message: String) : State()
-        data class Success(val calls: List<CallEntry>) : State()
-        /** Live fetch failed but cached data is available — show list + subtle error strip */
-        data class SuccessWithError(val calls: List<CallEntry>, val errorMsg: String) : State()
+        data class Success(val calls: List<CallEntry>,
+                           val updatedAt: LocalDateTime = LocalDateTime.now()) : State()
+        data class SuccessWithError(val calls: List<CallEntry>, val errorMsg: String,
+                                    val updatedAt: LocalDateTime = LocalDateTime.now()) : State()
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun applyFilter(entries: List<CallEntry>, prefs: AppPreferences): List<CallEntry> =
+        prefs.activeCallTypeFilter()
+            ?.let { allowed -> entries.filter { it.type in allowed } }
+            ?: entries
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -100,21 +141,27 @@ class CallLogWidget : AppWidgetProvider() {
             val prefs = AppPreferences(context)
             val repo  = CallRepository(prefs)
 
-            // Show last cached data immediately — widget is never blank during refresh
+            // Show cached data immediately
             val cached = repo.getCachedEntries()
             if (cached != null) {
-                val s = State.Success(cached.take(prefs.maxEntries))
+                val filtered = applyFilter(cached, prefs)
+                val s = State.Success(filtered.take(prefs.maxEntries))
                 for (id in ids) updateWidget(context, manager, id, s, prefs)
             }
 
             val result = repo.fetchCallLog(context)
             val state = result.fold(
-                onSuccess = { calls -> State.Success(calls.take(prefs.maxEntries)) },
+                onSuccess = { calls ->
+                    State.Success(calls.take(prefs.maxEntries))
+                },
                 onFailure = { error ->
                     val c = repo.getCachedEntries()
-                    if (c != null) State.SuccessWithError(c.take(prefs.maxEntries),
-                                                          error.message ?: "Fehler")
-                    else           State.Error(error.message ?: "Unknown error")
+                    val filtered = c?.let { applyFilter(it, prefs) }
+                    if (filtered != null)
+                        State.SuccessWithError(filtered.take(prefs.maxEntries),
+                                               error.message ?: "Fehler")
+                    else
+                        State.Error(error.message ?: "Unknown error")
                 }
             )
             for (id in ids) updateWidget(context, manager, id, state, prefs)
@@ -128,6 +175,7 @@ class CallLogWidget : AppWidgetProvider() {
         views.setViewVisibility(R.id.list_calls,       View.GONE)
         views.setViewVisibility(R.id.tv_empty,         View.GONE)
         views.setViewVisibility(R.id.tv_error_overlay, View.GONE)
+        views.setViewVisibility(R.id.tv_last_updated,  View.GONE)
         manager.updateAppWidget(id, views)
     }
 
@@ -141,18 +189,29 @@ class CallLogWidget : AppWidgetProvider() {
         val ctx    = SettingsActivity.wrapLocale(context, prefs.language)
         val views  = RemoteViews(context.packageName, R.layout.widget_call_log)
 
+        // Background and header colours
         views.setInt(R.id.widget_root,    "setBackgroundColor", colors.widgetBg)
         views.setInt(R.id.header_row,     "setBackgroundColor", colors.headerBg)
         views.setInt(R.id.col_header_row, "setBackgroundColor", colors.colHeaderBg)
+
+        // Header texts
         views.setTextColor(R.id.tv_widget_title, colors.headerText)
         views.setTextColor(R.id.tv_col_date,     colors.colHeaderText)
         views.setTextColor(R.id.tv_col_time,     colors.colHeaderText)
         views.setTextColor(R.id.tv_col_name,     colors.colHeaderText)
-        views.setTextViewText(R.id.tv_widget_title, ctx.getString(R.string.widget_title))
-        views.setTextViewText(R.id.tv_col_date,     ctx.getString(R.string.col_date))
-        views.setTextViewText(R.id.tv_col_time,     ctx.getString(R.string.col_time))
-        views.setTextViewText(R.id.tv_col_name,     ctx.getString(R.string.col_name))
 
+        // Column header text (use filter label when not "all")
+        val filterLabel = filterLabel(ctx, prefs.callFilter)
+        val titleText   = if (prefs.callFilter == "all")
+            ctx.getString(R.string.widget_title)
+        else
+            "${ctx.getString(R.string.widget_title)} · $filterLabel"
+        views.setTextViewText(R.id.tv_widget_title, titleText)
+        views.setTextViewText(R.id.tv_col_date, ctx.getString(R.string.col_date))
+        views.setTextViewText(R.id.tv_col_time, ctx.getString(R.string.col_time))
+        views.setTextViewText(R.id.tv_col_name, ctx.getString(R.string.col_name))
+
+        // Header buttons
         views.setOnClickPendingIntent(R.id.btn_refresh,
             PendingIntent.getBroadcast(context, 0,
                 Intent(context, CallLogWidget::class.java).apply { action = ACTION_REFRESH },
@@ -160,6 +219,22 @@ class CallLogWidget : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.btn_settings,
             PendingIntent.getActivity(context, 1,
                 Intent(context, SettingsActivity::class.java), mutableFlags()))
+        // Filter cycle button (tap widget title to cycle)
+        views.setOnClickPendingIntent(R.id.tv_widget_title,
+            PendingIntent.getBroadcast(context, 3,
+                Intent(context, CallLogWidget::class.java).apply { action = ACTION_NEXT_FILTER },
+                mutableFlags()))
+
+        // "Last updated" timestamp (optional)
+        val showTs = prefs.showLastUpdated
+        views.setViewVisibility(R.id.tv_last_updated,
+            if (showTs && state is State.Success) View.VISIBLE else View.GONE)
+        if (showTs && state is State.Success) {
+            val ts = state.updatedAt.format(DateTimeFormatter.ofPattern("HH:mm"))
+            views.setTextViewText(R.id.tv_last_updated,
+                ctx.getString(R.string.last_updated, ts))
+            views.setTextColor(R.id.tv_last_updated, colors.textSecondary)
+        }
 
         when (state) {
             is State.Loading -> {
@@ -193,7 +268,6 @@ class CallLogWidget : AppWidgetProvider() {
                 if (hasCalls) bindListAdapter(context, views, state.calls, colors, prefs)
             }
             is State.SuccessWithError -> {
-                // Show cached call list + subtle dark-red error strip at the bottom
                 val hasCalls = state.calls.isNotEmpty()
                 views.setViewVisibility(R.id.widget_loading,   View.GONE)
                 views.setViewVisibility(R.id.tv_error,         View.GONE)
@@ -212,6 +286,16 @@ class CallLogWidget : AppWidgetProvider() {
         manager.updateAppWidget(id, views)
     }
 
+    private fun filterLabel(ctx: Context, filter: String): String = when (filter) {
+        "missed"    -> ctx.getString(R.string.call_type_missed)
+        "incoming"  -> ctx.getString(R.string.call_type_incoming)
+        "outgoing"  -> ctx.getString(R.string.call_type_outgoing)
+        "blocked"   -> ctx.getString(R.string.call_type_blocked)
+        "voicemail" -> ctx.getString(R.string.call_type_voicemail)
+        "fax"       -> ctx.getString(R.string.call_type_fax_received)
+        else        -> ""
+    }
+
     private fun bindListAdapter(
         context: Context, views: RemoteViews, calls: List<CallEntry>,
         colors: WidgetColors, prefs: AppPreferences
@@ -219,13 +303,13 @@ class CallLogWidget : AppWidgetProvider() {
         views.setPendingIntentTemplate(
             R.id.list_calls,
             PendingIntent.getActivity(context, 2,
-                Intent(context, DialActivity::class.java), mutableFlags())
-        )
+                Intent(context, DialActivity::class.java), mutableFlags()))
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             views.setRemoteAdapter(R.id.list_calls,
-                buildCollectionItems(calls, colors, prefs.fontSizeSp))
+                buildCollectionItems(calls, colors, prefs.fontSizeSp, prefs.showDuration))
         } else {
-            CallLogRemoteViewsService.update(calls, colors, prefs.fontSizeSp)
+            CallLogRemoteViewsService.update(calls, colors, prefs.fontSizeSp, prefs.showDuration)
             val svcIntent = Intent(context, CallLogRemoteViewsService::class.java).apply {
                 data = Uri.parse("fritz://calllog?t=${System.currentTimeMillis()}")
             }
@@ -236,7 +320,8 @@ class CallLogWidget : AppWidgetProvider() {
 
     @RequiresApi(Build.VERSION_CODES.S)
     private fun buildCollectionItems(
-        calls: List<CallEntry>, colors: WidgetColors, fontSizeSp: Float
+        calls: List<CallEntry>, colors: WidgetColors,
+        fontSizeSp: Float, showDuration: Boolean
     ): RemoteViews.RemoteCollectionItems {
         val pkg     = "com.tvcs.fritzboxcallwidget"
         val dateFmt = DateTimeFormatter.ofPattern("dd.MM.")
@@ -248,7 +333,15 @@ class CallLogWidget : AppWidgetProvider() {
             val row = RemoteViews(pkg, R.layout.widget_call_row)
             row.setTextViewText(R.id.tv_date, entry.date.format(dateFmt))
             row.setTextViewText(R.id.tv_time, entry.date.format(timeFmt))
-            row.setTextViewText(R.id.tv_name, entry.displayName)
+
+            // Name + optional duration
+            val nameText = if (showDuration && entry.duration > 0) {
+                val mins = entry.duration / 60
+                val secs = entry.duration % 60
+                "${entry.displayName}  ${mins}:${"%02d".format(secs)}"
+            } else entry.displayName
+            row.setTextViewText(R.id.tv_name, nameText)
+
             row.setTextColor(R.id.tv_date, colors.textPrimary)
             row.setTextColor(R.id.tv_time, colors.textSecondary)
             row.setTextColor(R.id.tv_name, colors.textPrimary)

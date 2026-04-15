@@ -52,6 +52,17 @@
     </RelativeLayout>
 
     <!-- Column headers -->
+        <TextView
+        android:id="@+id/tv_last_updated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:textSize="9sp"
+        android:gravity="end"
+        android:visibility="gone"
+        android:text="" />
+
     <LinearLayout
         android:id="@+id/col_header_row"
         android:layout_width="match_parent"

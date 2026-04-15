@@ -26,6 +26,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.ConnectionSpec
 import okio.ByteString.Companion.decodeHex
+import org.w3c.dom.Document
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.URL
+import java.net.UnknownHostException
+import java.security.SecureRandom
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+import javax.net.ssl.SSLException
 
 /**
  * FritzBox connection client supporting:
@@ -41,14 +50,14 @@ class FritzBoxClient(
     private val password: String
 ) {
     companion object {
-        private const val TAG                       = "FritzBoxClient"
-        private const val ONTEL_SERVICE             = "urn:dslforum-org:service:X_AVM-DE_OnTel:1"
-        private const val ONTEL_CONTROL_URL         = "/upnp/control/x_contact"
+        private const val TAG = "FritzBoxClient"
+        private const val ONTEL_SERVICE = "urn:dslforum-org:service:X_AVM-DE_OnTel:1"
+        private const val ONTEL_CONTROL_URL = "/upnp/control/x_contact"
         private const val SOAP_ACTION_GET_CALL_LIST = "GetCallList"
-        private const val CALL_LIST_MAX_DAYS        = 30
+        private const val CALL_LIST_MAX_DAYS = 30
     }
 
-    private val scheme  = if (profile.useHttps) "https" else "http"
+    private val scheme = if (profile.useHttps) "https" else "http"
     private val baseUrl = "$scheme://${profile.host}:${profile.port}"
 
     private val httpClient: OkHttpClient by lazy {
@@ -69,14 +78,18 @@ class FritzBoxClient(
         val trustAllCerts = @SuppressLint("CustomX509TrustManager")
         object : X509TrustManager {
             @SuppressLint("TrustAllX509TrustManager")
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
+            }
+
             @SuppressLint("TrustAllX509TrustManager")
-            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+            }
+
             override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
         }
 
         val sslContext = SSLContext.getInstance("TLS").apply {
-            init(null, arrayOf<TrustManager>(trustAllCerts), java.security.SecureRandom())
+            init(null, arrayOf<TrustManager>(trustAllCerts), SecureRandom())
         }
 
         sslSocketFactory(sslContext.socketFactory, trustAllCerts)
@@ -97,7 +110,7 @@ class FritzBoxClient(
     suspend fun getCallList(): List<FritzCallEntry> = withContext(Dispatchers.IO) {
         when (profile.type) {
             ConnectionType.INTERNET_MYFRITZ -> getCallListMyFritz()
-            else                            -> getCallListTR064()
+            else -> getCallListTR064()
         }
     }
 
@@ -150,10 +163,15 @@ class FritzBoxClient(
             computeMd5Response(challenge)
 
         // --- BLOCKTIME LOGIK ---
-        val blockTime = challengeXml.substringAfter("<BlockTime>").substringBefore("</BlockTime>").trim().toIntOrNull() ?: 0
+        val blockTime =
+            challengeXml.substringAfter("<BlockTime>").substringBefore("</BlockTime>").trim()
+                .toIntOrNull() ?: 0
         if (blockTime > 0) {
             // Countdown-Schleife von blockTime bis 1
-            Log.w(TAG, "FritzBox fordert eine Wartezeit von $blockTime Sekunden (Brute-Force-Schutz)")
+            Log.w(
+                TAG,
+                "FritzBox fordert eine Wartezeit von $blockTime Sekunden (Brute-Force-Schutz)"
+            )
             Thread.sleep(blockTime * 1000L)
         }
         // -----------------------
@@ -175,7 +193,10 @@ class FritzBoxClient(
         if (sid == "0000000000000000" || sid.isBlank())
             throw FritzBoxException("Anmeldung fehlgeschlagen — Benutzername oder Passwort falsch")
 
-        Log.d(TAG, "MyFRITZ login OK (${if (challenge.startsWith("2\$")) "v2/PBKDF2" else "v1/MD5"})")
+        Log.d(
+            TAG,
+            "MyFRITZ login OK (${if (challenge.startsWith("2\$")) "v2/PBKDF2" else "v1/MD5"})"
+        )
         sid
     }
 
@@ -211,20 +232,23 @@ class FritzBoxClient(
     }
 
     private fun pbkdf2(password: CharArray, salt: ByteArray, iterations: Int): ByteArray {
-        val spec = javax.crypto.spec.PBEKeySpec(password, salt, iterations, 256)
-        return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        val spec = PBEKeySpec(password, salt, iterations, 256)
+        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            .generateSecret(spec).encoded
     }
 
     // ── TR-064 SOAP ───────────────────────────────────────────────────────────
 
     private fun getCallListTR064(): List<FritzCallEntry> {
-        val soapBody    = buildSoapEnvelope(ONTEL_SERVICE, SOAP_ACTION_GET_CALL_LIST,
-                              mapOf("NewMaxDays" to CALL_LIST_MAX_DAYS.toString()))
-        val url         = "$baseUrl$ONTEL_CONTROL_URL"
-        val soapAction  = "\"$ONTEL_SERVICE#$SOAP_ACTION_GET_CALL_LIST\""
+        val soapBody = buildSoapEnvelope(
+            ONTEL_SERVICE, SOAP_ACTION_GET_CALL_LIST,
+            mapOf("NewMaxDays" to CALL_LIST_MAX_DAYS.toString())
+        )
+        val url = "$baseUrl$ONTEL_CONTROL_URL"
+        val soapAction = "\"$ONTEL_SERVICE#$SOAP_ACTION_GET_CALL_LIST\""
         val responseXml = performAuthenticatedSoapRequest(url, soapAction, soapBody)
 
-        val doc      = parseXml(responseXml)
+        val doc = parseXml(responseXml)
         val urlNodes: NodeList = doc.getElementsByTagName("NewCallListURL")
         if (urlNodes.length == 0)
             throw FritzBoxException("Keine NewCallListURL in TR-064-Antwort")
@@ -239,8 +263,12 @@ class FritzBoxClient(
         }
     }
 
-    private fun performAuthenticatedSoapRequest(url: String, soapAction: String, body: String): String {
-        val mediaType   = "text/xml; charset=utf-8".toMediaType()
+    private fun performAuthenticatedSoapRequest(
+        url: String,
+        soapAction: String,
+        body: String
+    ): String {
+        val mediaType = "text/xml; charset=utf-8".toMediaType()
         val requestBody = body.toRequestBody(mediaType)
 
         return wrapIo("TR-064 SOAP request") {
@@ -283,28 +311,28 @@ class FritzBoxClient(
             val c = line.split(";")
             if (c.size < 6) null
             else FritzCallEntry(
-                type     = c.getOrNull(0)?.trim()?.toIntOrNull() ?: 0,
-                date     = c.getOrNull(1)?.trim() ?: "",
-                name     = c.getOrNull(2)?.trim() ?: "",
-                caller   = c.getOrNull(3)?.trim() ?: "",
-                called   = c.getOrNull(5)?.trim() ?: "",
+                type = c.getOrNull(0)?.trim()?.toIntOrNull() ?: 0,
+                date = c.getOrNull(1)?.trim() ?: "",
+                name = c.getOrNull(2)?.trim() ?: "",
+                caller = c.getOrNull(3)?.trim() ?: "",
+                called = c.getOrNull(5)?.trim() ?: "",
                 duration = c.getOrNull(6)?.trim() ?: ""
             )
         }
 
     private fun parseCallListXml(xml: String): List<FritzCallEntry> {
-        val doc   = parseXml(xml)
+        val doc = parseXml(xml)
         val calls = doc.getElementsByTagName("Call")
         return (0 until calls.length).map { i ->
             val call = calls.item(i) as Element
             FritzCallEntry(
-                type       = call.getChildText("Type").toIntOrNull() ?: 0,
-                date       = call.getChildText("Date"),
-                name       = call.getChildText("Name"),
-                duration   = call.getChildText("Duration"),
-                caller     = call.getChildText("Caller"),
-                called     = call.getChildText("Called"),
-                port       = call.getChildText("Port").toIntOrNull() ?: -1,
+                type = call.getChildText("Type").toIntOrNull() ?: 0,
+                date = call.getChildText("Date"),
+                name = call.getChildText("Name"),
+                duration = call.getChildText("Duration"),
+                caller = call.getChildText("Caller"),
+                called = call.getChildText("Called"),
+                port = call.getChildText("Port").toIntOrNull() ?: -1,
                 numbertype = call.getChildText("Numbertype").lowercase()
             )
         }
@@ -313,17 +341,17 @@ class FritzBoxClient(
     // ── Auth helpers ──────────────────────────────────────────────────────────
 
     private fun buildDigestAuthHeader(url: String, method: String, wwwAuth: String): String {
-        val realm  = wwwAuth.extractDigestParam("realm")
-        val nonce  = wwwAuth.extractDigestParam("nonce")
-        val qop    = wwwAuth.extractDigestParam("qop")
+        val realm = wwwAuth.extractDigestParam("realm")
+        val nonce = wwwAuth.extractDigestParam("nonce")
+        val qop = wwwAuth.extractDigestParam("qop")
         val opaque = wwwAuth.extractDigestParam("opaque")
-        val uri    = java.net.URL(url).path
-        val ha1    = md5("$username:$realm:$password")
-        val ha2    = md5("$method:$uri")
-        val nc     = "00000001"
+        val uri = URL(url).path
+        val ha1 = md5("$username:$realm:$password")
+        val ha2 = md5("$method:$uri")
+        val nc = "00000001"
         val cnonce = System.currentTimeMillis().toString(16)
-        val resp   = if (qop == "auth") md5("$ha1:$nonce:$nc:$cnonce:$qop:$ha2")
-                     else               md5("$ha1:$nonce:$ha2")
+        val resp = if (qop == "auth") md5("$ha1:$nonce:$nc:$cnonce:$qop:$ha2")
+        else md5("$ha1:$nonce:$ha2")
         return buildString {
             append("Digest username=\"$username\", realm=\"$realm\", nonce=\"$nonce\", uri=\"$uri\", ")
             if (qop.isNotEmpty()) append("qop=$qop, nc=$nc, cnonce=\"$cnonce\", ")
@@ -334,7 +362,11 @@ class FritzBoxClient(
 
     // ── XML / util helpers ────────────────────────────────────────────────────
 
-    private fun buildSoapEnvelope(serviceType: String, actionName: String, args: Map<String, String>) =
+    private fun buildSoapEnvelope(
+        serviceType: String,
+        actionName: String,
+        args: Map<String, String>
+    ) =
         """<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
             s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
@@ -351,7 +383,7 @@ class FritzBoxClient(
      * - External general and parameter entities disabled
      * Prevents XML External Entity attacks from malicious FritzBox responses.
      */
-    private fun parseXml(xml: String): org.w3c.dom.Document {
+    private fun parseXml(xml: String): Document {
         val factory = DocumentBuilderFactory.newInstance().also { f ->
             f.isNamespaceAware = false
             // Android unterstützt setXIncludeAware nicht -> Entfernen oder in runCatching packen
@@ -367,6 +399,7 @@ class FritzBoxClient(
         }
         return factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
     }
+
     private fun md5(input: String): String =
         MessageDigest.getInstance("MD5").digest(input.toByteArray(Charsets.UTF_8)).toHexString()
 
@@ -375,7 +408,10 @@ class FritzBoxClient(
     private fun String.hexToBytes(): ByteArray {
         val data = ByteArray(length / 2)
         for (i in data.indices)
-            data[i] = ((Character.digit(this[i * 2], 16) shl 4) + Character.digit(this[i * 2 + 1], 16)).toByte()
+            data[i] = ((Character.digit(this[i * 2], 16) shl 4) + Character.digit(
+                this[i * 2 + 1],
+                16
+            )).toByte()
         return data
     }
 
@@ -394,18 +430,135 @@ class FritzBoxClient(
         block()
     } catch (e: FritzBoxException) {
         throw e
-    } catch (e: java.net.ConnectException) {
-        throw FritzBoxException("Keine Verbindung zu ${profile.host}:${profile.port} ($operation)", e)
-    } catch (e: java.net.SocketTimeoutException) {
-        throw FritzBoxException("Zeitüberschreitung bei ${profile.host}:${profile.port} ($operation)", e)
-    } catch (e: java.net.UnknownHostException) {
+    } catch (e: ConnectException) {
+        throw FritzBoxException(
+            "Keine Verbindung zu ${profile.host}:${profile.port} ($operation)",
+            e
+        )
+    } catch (e: SocketTimeoutException) {
+        throw FritzBoxException(
+            "Zeitüberschreitung bei ${profile.host}:${profile.port} ($operation)",
+            e
+        )
+    } catch (e: UnknownHostException) {
         throw FritzBoxException("Host nicht gefunden: ${profile.host}", e)
-    } catch (e: javax.net.ssl.SSLException) {
+    } catch (e: SSLException) {
         throw FritzBoxException("SSL-Fehler bei ${profile.host} ($operation): ${e.message}", e)
     } catch (e: IOException) {
         throw FritzBoxException("Netzwerkfehler bei $operation: ${e.message}", e)
     }
-}
+
+    // ── Click-to-Dial (X_AVM-DE_DialNumber) ──────────────────────────────────
+
+    /**
+     * Initiates an outgoing call via the FritzBox.
+     *
+     * The FritzBox dials [number] and then calls back on [fromExtension].
+     * If [fromExtension] is empty the FritzBox uses its default outgoing line.
+     *
+     * The call is placed via TR-064 action X_AVM-DE_DialNumber on service
+     * X_AVM-DE_OnTel:1.  The FritzBox rings [fromExtension] first; when the
+     * user picks up, it places the call to [number].
+     *
+     * Only available for TR-064 profiles (LAN and Internet); throws
+     * [FritzBoxException] when called on a MyFRITZ profile.
+     */
+    @Throws(FritzBoxException::class)
+    suspend fun dialNumber(number: String, fromExtension: String = ""): Unit =
+        withContext(Dispatchers.IO) {
+            if (profile.type == ConnectionType.INTERNET_MYFRITZ)
+                throw FritzBoxException("Click-to-Dial ist nur über TR-064 verfügbar, nicht über MyFRITZ")
+
+            val args = buildMap<String, String> {
+                put("NewX_AVM-DE_PhoneNumber", number)
+                if (fromExtension.isNotBlank())
+                    put("NewX_AVM-DE_InternalNumber", fromExtension)
+            }
+            val soapBody = buildSoapEnvelope(
+                serviceType = ONTEL_SERVICE,
+                actionName  = "X_AVM-DE_DialNumber",
+                args        = args
+            )
+            val url        = "$baseUrl$ONTEL_CONTROL_URL"
+            val soapAction = "\"$ONTEL_SERVICE#X_AVM-DE_DialNumber\""
+            performAuthenticatedSoapRequest(url, soapAction, soapBody)
+            Log.d(TAG, "Dial initiated: $number via ${fromExtension.ifBlank { "default" }}")
+        }
+
+    // ── Phonebook lookup (GetPhonebook) ───────────────────────────────────────
+
+    /**
+     * Returns a map of phone number → contact name from the FritzBox phonebook.
+     *
+     * Fetches the default phonebook (index 0). Numbers are normalised for
+     * matching: leading country code and whitespace are stripped so that
+     * e.g. "+49621123" and "0621123" can both be matched against "06211234".
+     *
+     * Only available for TR-064 profiles.
+     */
+    @Throws(FritzBoxException::class)
+    suspend fun getPhonebook(): Map<String, String> = withContext(Dispatchers.IO) {
+        if (profile.type == ConnectionType.INTERNET_MYFRITZ)
+            throw FritzBoxException("Telefonbuch-Abruf ist nur über TR-064 verfügbar")
+
+        val phonebookService = "urn:dslforum-org:service:X_AVM-DE_OnTel:1"
+        // Step 1: get phonebook URL
+        val urlBody = buildSoapEnvelope(
+            serviceType = phonebookService,
+            actionName  = "GetPhonebook",
+            args        = mapOf("NewPhonebookID" to "0")
+        )
+        val url = "$baseUrl$ONTEL_CONTROL_URL"
+        val soapAction = "\"$phonebookService#GetPhonebook\""
+        val responseXml = performAuthenticatedSoapRequest(url, soapAction, urlBody)
+        val phonebookUrl = parseXml(responseXml)
+            .getElementsByTagName("NewPhonebookURL")
+            .item(0)?.textContent?.trim()
+            ?: throw FritzBoxException("Keine Telefonbuch-URL in TR-064-Antwort")
+
+        // Step 2: download and parse phonebook XML
+        wrapIo("Telefonbuch herunterladen") {
+            httpClient.newCall(Request.Builder().url(phonebookUrl).build()).execute().use { r ->
+                val body = r.body.string()
+                if (!r.isSuccessful)
+                    throw FritzBoxException("HTTP ${r.code} beim Telefonbuch-Download")
+                parsePhonebook(body)
+            }
+        }
+    }
+
+    private fun parsePhonebook(xml: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        runCatching {
+            val doc = parseXml(xml)
+            val contacts = doc.getElementsByTagName("contact")
+            for (i in 0 until contacts.length) {
+                val contact  = contacts.item(i) as? Element ?: continue
+                val nameNode = contact.getElementsByTagName("realName").item(0)
+                val name     = nameNode?.textContent?.trim() ?: continue
+                if (name.isBlank()) continue
+
+                val numbers = contact.getElementsByTagName("number")
+                for (j in 0 until numbers.length) {
+                    val raw = numbers.item(j)?.textContent?.trim() ?: continue
+                    if (raw.isNotBlank()) result[normaliseNumber(raw)] = name
+                }
+            }
+        }.onFailure { Log.w(TAG, "Telefonbuch-Parse-Fehler: ${it.message}") }
+        return result
+    }
+
+    /**
+     * Normalises a phone number for matching: removes whitespace, dashes,
+     * parentheses, and optional leading country code (+49 or 0049).
+     */
+    private fun normaliseNumber(raw: String): String {
+        var n = raw.replace(Regex("[\\s\\-()/.+]"), "")
+        if (n.startsWith("0049")) n = n.removePrefix("0049")
+        if (n.startsWith("49") && n.length > 10) n = n.removePrefix("49")
+        return n.trimStart('0').ifEmpty { n }
+    }
+
 
 data class FritzCallEntry(
     val type: Int,
@@ -421,3 +574,4 @@ data class FritzCallEntry(
 )
 
 class FritzBoxException(message: String, cause: Throwable? = null) : Exception(message, cause)
+}

@@ -108,4 +108,33 @@
     <string name="call_type_fax_sent">Fax enviado</string>
     <string name="call_type_active_incoming">Llamada activa (entrante)</string>
     <string name="call_type_active_outgoing">Llamada activa (saliente)</string>
+    <string name="pref_category_advanced">Funciones avanzadas</string>
+    <string name="pref_exact_alarm_title">⚠ Falta permiso de alarma exacta</string>
+    <string name="pref_exact_alarm_summary">Toca para abrir la configuración del sistema. Sin este permiso, los intervalos de actualización pueden ser imprecisos.</string>
+    <string name="pref_show_duration_title">Mostrar duración de llamada</string>
+    <string name="pref_show_duration_summary">Mostrar duración tras el nombre/número (p. ej. 2:35)</string>
+    <string name="pref_show_last_updated_title">Mostrar última actualización</string>
+    <string name="pref_show_last_updated_summary">Mostrar marca de tiempo de la última actualización exitosa en el encabezado</string>
+    <string name="last_updated">Actualizado: %s</string>
+    <string name="pref_call_filter_title">Filtro de llamadas</string>
+    <string name="call_filter_all">Todas las llamadas</string>
+    <string name="call_filter_fax">Fax</string>
+    <string name="pref_click_to_dial_title">Marcar mediante FritzBox</string>
+    <string name="pref_click_to_dial_summary">La FritzBox llama primero a tu teléfono y luego al número seleccionado (requiere TR-064)</string>
+    <string name="pref_click_to_dial_ext_title">Tu número de extensión</string>
+    <string name="pref_click_to_dial_ext_summary">Extensión interna que debe llamar la FritzBox (p. ej. **610). Vacío = línea por defecto.</string>
+    <string name="click_to_dial_initiated">Llamando a %s mediante FritzBox…</string>
+    <string name="click_to_dial_failed">Error al marcar — abriendo aplicación de teléfono</string>
+    <string name="click_to_dial_no_profile">Sin perfil TR-064 configurado — abriendo aplicación de teléfono</string>
+    <string name="pref_phonebook_lookup_title">Agenda FritzBox</string>
+    <string name="pref_phonebook_lookup_summary">Buscar números desconocidos en la agenda de la FritzBox (solo TR-064)</string>
+    <string name="pref_missed_notifications_title">Notificaciones de llamadas perdidas</string>
+    <string name="pref_missed_notifications_summary">Comprobar nuevas llamadas perdidas en segundo plano y notificar (cada 15 min)</string>
+    <string name="notif_channel_name">Llamadas perdidas</string>
+    <string name="notif_channel_desc">Notificaciones de nuevas llamadas perdidas de la FritzBox</string>
+    <string name="notif_permission_denied">Permiso de notificación denegado — notificaciones desactivadas</string>
+    <plurals name="notif_missed_title">
+        <item quantity="one">%d llamada perdida</item>
+        <item quantity="other">%d llamadas perdidas</item>
+    </plurals>
 </resources>

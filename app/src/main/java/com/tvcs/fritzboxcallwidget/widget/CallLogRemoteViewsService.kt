@@ -20,11 +20,13 @@ class CallLogRemoteViewsService : RemoteViewsService() {
             0xFF212121.toInt(), 0xFF757575.toInt(), 0xFFBDBDBD.toInt(), 0xFFD32F2F.toInt()
         )
         @Volatile var fontSizeSp: Float = 11f
+        @Volatile var showDuration: Boolean = false
 
-        fun update(calls: List<CallEntry>, c: WidgetColors, size: Float) {
-            cachedCalls = calls
-            colors      = c
-            fontSizeSp  = size
+        fun update(calls: List<CallEntry>, c: WidgetColors, size: Float, duration: Boolean = false) {
+            cachedCalls    = calls
+            colors         = c
+            fontSizeSp     = size
+            showDuration   = duration
         }
         fun getCalls() = cachedCalls
     }
@@ -34,20 +36,22 @@ class CallLogRemoteViewsService : RemoteViewsService() {
 
 private class CallLogViewsFactory : RemoteViewsService.RemoteViewsFactory {
 
-    private val dateFmt  = DateTimeFormatter.ofPattern("dd.MM.")
-    private val timeFmt  = DateTimeFormatter.ofPattern("HH:mm")
-    private var calls    = listOf<CallEntry>()
-    private var colors   = CallLogRemoteViewsService.colors
-    private var fontSize = CallLogRemoteViewsService.fontSizeSp
+    private val dateFmt      = DateTimeFormatter.ofPattern("dd.MM.")
+    private val timeFmt      = DateTimeFormatter.ofPattern("HH:mm")
+    private var calls        = listOf<CallEntry>()
+    private var colors       = CallLogRemoteViewsService.colors
+    private var fontSize     = CallLogRemoteViewsService.fontSizeSp
+    private var showDuration = CallLogRemoteViewsService.showDuration
 
     override fun onCreate()         { refresh() }
     override fun onDataSetChanged() { refresh() }
     override fun onDestroy()        {}
 
     private fun refresh() {
-        calls    = CallLogRemoteViewsService.getCalls()
-        colors   = CallLogRemoteViewsService.colors
-        fontSize = CallLogRemoteViewsService.fontSizeSp
+        calls        = CallLogRemoteViewsService.getCalls()
+        colors       = CallLogRemoteViewsService.colors
+        fontSize     = CallLogRemoteViewsService.fontSizeSp
+        showDuration = CallLogRemoteViewsService.showDuration
     }
 
     override fun getCount()          = calls.size
@@ -66,7 +70,12 @@ private class CallLogViewsFactory : RemoteViewsService.RemoteViewsFactory {
         // Text content
         views.setTextViewText(R.id.tv_date, entry.date.format(dateFmt))
         views.setTextViewText(R.id.tv_time, entry.date.format(timeFmt))
-        views.setTextViewText(R.id.tv_name, entry.displayName)
+        val nameText = if (showDuration && entry.duration > 0) {
+            val mins = entry.duration / 60
+            val secs = entry.duration % 60
+            "${entry.displayName}  ${mins}:${"02d".format(secs)}"
+        } else entry.displayName
+        views.setTextViewText(R.id.tv_name, nameText)
 
         // Text colors
         views.setTextColor(R.id.tv_date, colors.textPrimary)

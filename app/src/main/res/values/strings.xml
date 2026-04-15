@@ -118,4 +118,33 @@
     <string name="call_type_fax_sent">Fax sent</string>
     <string name="call_type_active_incoming">Active call (incoming)</string>
     <string name="call_type_active_outgoing">Active call (outgoing)</string>
+    <string name="pref_category_advanced">Advanced features</string>
+    <string name="pref_exact_alarm_title">⚠ Exact alarm permission missing</string>
+    <string name="pref_exact_alarm_summary">Tap to allow exact alarms in system settings. Without this, refresh intervals may be imprecise.</string>
+    <string name="pref_show_duration_title">Show call duration</string>
+    <string name="pref_show_duration_summary">Display duration after name/number (e.g. 2:35)</string>
+    <string name="pref_show_last_updated_title">Show last updated time</string>
+    <string name="pref_show_last_updated_summary">Display timestamp of the last successful refresh in the header</string>
+    <string name="last_updated">Updated: %s</string>
+    <string name="pref_call_filter_title">Call filter</string>
+    <string name="call_filter_all">All calls</string>
+    <string name="call_filter_fax">Fax</string>
+    <string name="pref_click_to_dial_title">Click-to-Dial via FritzBox</string>
+    <string name="pref_click_to_dial_summary">FritzBox calls your phone first, then connects to the selected number (requires TR-064)</string>
+    <string name="pref_click_to_dial_ext_title">Your extension number</string>
+    <string name="pref_click_to_dial_ext_summary">Internal extension the FritzBox should ring (e.g. **610). Leave empty for default line.</string>
+    <string name="click_to_dial_initiated">Calling %s via FritzBox…</string>
+    <string name="click_to_dial_failed">Click-to-Dial failed — opening phone app</string>
+    <string name="click_to_dial_no_profile">No TR-064 profile configured — opening phone app</string>
+    <string name="pref_phonebook_lookup_title">FritzBox phonebook lookup</string>
+    <string name="pref_phonebook_lookup_summary">Look up unknown numbers in the FritzBox phonebook (TR-064 only)</string>
+    <string name="pref_missed_notifications_title">Missed call notifications</string>
+    <string name="pref_missed_notifications_summary">Get notified about new missed calls in the background (every 15 min)</string>
+    <string name="notif_channel_name">Missed calls</string>
+    <string name="notif_channel_desc">Notifications for new missed calls from the FritzBox</string>
+    <string name="notif_permission_denied">Notification permission denied — notifications disabled</string>
+    <plurals name="notif_missed_title">
+        <item quantity="one">%d missed call</item>
+        <item quantity="other">%d missed calls</item>
+    </plurals>
 </resources>
