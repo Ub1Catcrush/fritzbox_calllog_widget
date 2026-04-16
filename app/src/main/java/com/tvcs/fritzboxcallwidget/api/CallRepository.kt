@@ -223,10 +223,11 @@ class CallRepository(private val prefs: AppPreferences) {
         val rawNumber = if (type == CallType.OUTGOING && raw.called.isNotBlank())
             raw.called else raw.caller
         return CallEntry(
-            date   = date,
-            type   = type,
-            name   = raw.name.takeIf { it.isNotBlank() },
-            number = applyPrefix(rawNumber, prefix)
+                date   = date,
+                type   = type,
+                name   = raw.name.takeIf { it.isNotBlank() },
+                number = applyPrefix(rawNumber, prefix),
+                duration = (raw.duration.toDoubleOrNull() ?: 0.0).times(100.0).times(60.0).toInt()
         )
     }
 
