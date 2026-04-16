@@ -11,7 +11,7 @@ Un widget d'écran d'accueil Android personnalisable qui récupère le journal d
 ## Fonctionnalités
 
 ### Widget
-- 📋 **Journal d'appels défilant** avec quatre colonnes : date, heure, icône de type d'appel, nom/numéro
+- 📋 **Journal d'appels défilant** avec quatre colonnes : date, heure, icône de type d'appel, nom/numéro (cinquième colonne optionnelle pour la durée)
 - 📞 **Appui sur une ligne** ouvre le composeur système avec le numéro pré-rempli
 - 💾 **Données en cache toujours visibles** — dernière liste chargée affichée immédiatement, même pendant une actualisation en arrière-plan
 - ⚠️ **Erreurs en superposition discrète** — les erreurs de connexion s'affichent en bas sans remplacer la liste
@@ -49,6 +49,7 @@ Un widget d'écran d'accueil Android personnalisable qui récupère le journal d
 - ⏱️ **Intervalle d'actualisation** configurable en secondes
 - 🎨 **Couleurs entièrement personnalisables** — jeux séparés pour les modes clair et sombre, 11 couleurs chacun
 - 🔤 **Taille de police** réglable (8–16 sp)
+- ⏱️ **Durée des appels** affichable en option dans une colonne étroite à droite
 - 🌍 **Multilingue** : allemand, anglais, français, espagnol
 
 ---

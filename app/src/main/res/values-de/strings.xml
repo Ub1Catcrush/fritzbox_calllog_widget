@@ -15,6 +15,7 @@
     <string name="col_date">Datum</string>
     <string name="col_time">Zeit</string>
     <string name="col_name">Name / Nummer</string>
+    <string name="col_duration">Dauer</string>
     <string name="pref_category_connection">Verbindung</string>
     <string name="pref_category_refresh">Aktualisierung &amp; Daten</string>
     <string name="pref_category_phone">Telefon</string>

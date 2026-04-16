@@ -11,7 +11,7 @@ A customisable Android home screen widget that fetches the call log from your AV
 ## Features
 
 ### Widget
-- 📋 **Scrollable call list** with four columns: date, time, call-type icon, name/number
+- 📋 **Scrollable call list** with four columns: date, time, call-type icon, name/number (optional fifth column for call duration)
 - 📞 **Tap any row** to open the system phone app with the number pre-filled
 - 💾 **Cached data always visible** — last loaded list shown immediately, even during a background refresh
 - ⚠️ **Errors as subtle overlay** — connection errors appear as a narrow strip at the bottom, without replacing the list
@@ -51,6 +51,7 @@ A customisable Android home screen widget that fetches the call log from your AV
 - 📱 **Phone number prefix**: replaces leading `0` with a country code (e.g. `0621…` → `+49621…`)
 - 🎨 **Fully customisable colours** — separate sets for light and dark mode, 11 colours each, ARGB picker with sliders, hex input, and live swatch preview
 - 🔤 **Font size** adjustable (8–16 sp)
+- ⏱️ **Call duration** optionally shown as a narrow column on the right edge
 - 🌍 **Multilingual**: German, English, French, Spanish
 
 ---
@@ -119,6 +120,7 @@ A customisable Android home screen widget that fetches the call log from your AV
 | Language | System · Deutsch · English · Français · Español |
 | Theme | System · Light · Dark |
 | Font size | 8 · 9 · 10 · **11** · 12 · 13 · 14 · 16 sp |
+| Show call duration | On / **Off** |
 
 ---
 

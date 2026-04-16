@@ -70,22 +70,29 @@ private class CallLogViewsFactory : RemoteViewsService.RemoteViewsFactory {
         // Text content
         views.setTextViewText(R.id.tv_date, entry.date.format(dateFmt))
         views.setTextViewText(R.id.tv_time, entry.date.format(timeFmt))
-        val nameText = if (showDuration && entry.duration > 0) {
+        views.setTextViewText(R.id.tv_name, entry.displayName)
+
+        // Duration column: show as own narrow column when enabled
+        if (showDuration && entry.duration > 0) {
             val mins = entry.duration / 60
             val secs = entry.duration % 60
-            "${entry.displayName}  ${mins}:${"02d".format(secs)}"
-        } else entry.displayName
-        views.setTextViewText(R.id.tv_name, nameText)
+            views.setTextViewText(R.id.tv_duration, "%d:%02d".format(mins, secs))
+            views.setViewVisibility(R.id.tv_duration, android.view.View.VISIBLE)
+        } else {
+            views.setViewVisibility(R.id.tv_duration, android.view.View.GONE)
+        }
 
         // Text colors
         views.setTextColor(R.id.tv_date, colors.textPrimary)
         views.setTextColor(R.id.tv_time, colors.textSecondary)
         views.setTextColor(R.id.tv_name, colors.textPrimary)
+        views.setTextColor(R.id.tv_duration, colors.textSecondary)
 
         // Font size — setTextViewTextSize is officially supported by RemoteViews
         views.setTextViewTextSize(R.id.tv_date, TypedValue.COMPLEX_UNIT_SP, fontSize)
         views.setTextViewTextSize(R.id.tv_time, TypedValue.COMPLEX_UNIT_SP, fontSize)
         views.setTextViewTextSize(R.id.tv_name, TypedValue.COMPLEX_UNIT_SP, fontSize)
+        views.setTextViewTextSize(R.id.tv_duration, TypedValue.COMPLEX_UNIT_SP, fontSize)
 
         // NOTE: setTypeface via setInt reflection is intentionally omitted —
         // RemoteViews does not support it and throws ActionException at runtime,

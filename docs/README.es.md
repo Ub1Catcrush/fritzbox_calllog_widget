@@ -11,7 +11,7 @@ Un widget de pantalla de inicio de Android personalizable que obtiene el registr
 ## Características
 
 ### Widget
-- 📋 **Registro de llamadas desplazable** con cuatro columnas: fecha, hora, icono de tipo, nombre/número
+- 📋 **Registro de llamadas desplazable** con cuatro columnas: fecha, hora, icono de tipo, nombre/número (quinta columna opcional para la duración)
 - 📞 **Toca una fila** para abrir el marcador del sistema con el número prellenado
 - 💾 **Datos en caché siempre visibles** — última lista cargada mostrada inmediatamente, incluso durante una actualización en segundo plano
 - ⚠️ **Errores como superposición discreta** — los errores de conexión aparecen en la parte inferior sin reemplazar la lista
@@ -49,6 +49,7 @@ Un widget de pantalla de inicio de Android personalizable que obtiene el registr
 - ⏱️ **Intervalo de actualización** configurable en segundos
 - 🎨 **Colores totalmente personalizables** — conjuntos separados para modos claro y oscuro, 11 colores cada uno
 - 🔤 **Tamaño de fuente** ajustable (8–16 sp)
+- ⏱️ **Duración de llamada** opcional como columna estrecha en el borde derecho
 - 🌍 **Multilingüe**: alemán, inglés, francés, español
 
 ---

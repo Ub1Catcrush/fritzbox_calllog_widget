@@ -17,6 +17,7 @@
     <string name="col_date">Date</string>
     <string name="col_time">Time</string>
     <string name="col_name">Name / Number</string>
+    <string name="col_duration">Dur.</string>
     <!-- Pref categories -->
     <string name="pref_category_connection">Connection</string>
     <string name="pref_category_refresh">Refresh &amp; Data</string>

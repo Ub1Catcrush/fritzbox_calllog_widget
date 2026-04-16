@@ -107,6 +107,19 @@
             android:textStyle="bold"
             android:textColor="@color/widget_col_header_text" />
 
+        <!-- Duration column header: only visible when showDuration is enabled -->
+        <TextView
+            android:id="@+id/tv_col_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/col_duration"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_col_header_text"
+            android:paddingStart="6dp"
+            android:gravity="end"
+            android:visibility="gone" />
+
     </LinearLayout>
 
     <!-- Loading -->

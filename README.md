@@ -11,7 +11,7 @@ Ein anpassbares Android-Homescreen-Widget, das das Anrufprotokoll deiner FRITZ!B
 ## Features
 
 ### Widget
-- 📋 **Scrollbare Anrufliste** mit vier Spalten: Datum, Uhrzeit, Anruf-Typ-Icon, Name/Nummer
+- 📋 **Scrollbare Anrufliste** mit vier Spalten: Datum, Uhrzeit, Anruf-Typ-Icon, Name/Nummer (optional: fünfte Spalte für Gesprächsdauer)
 - 📞 **Tap auf einen Eintrag** öffnet direkt die Telefon-App mit der vorgewählten Nummer
 - 💾 **Gecachte Daten immer sichtbar** – zuletzt geladene Liste wird sofort angezeigt, auch während einer Aktualisierung im Hintergrund
 - ⚠️ **Fehler als dezentes Overlay** – Verbindungsfehler erscheinen als schmaler Streifen am unteren Rand, ohne die Liste zu ersetzen
@@ -51,6 +51,7 @@ Ein anpassbares Android-Homescreen-Widget, das das Anrufprotokoll deiner FRITZ!B
 - 📱 **Telefonnummern-Präfix**: führende `0` wird automatisch durch Ländervorwahl ersetzt (z.B. `0621…` → `+49621…`)
 - 🎨 **Vollständig anpassbare Farben** – separate Farbsätze für Hell- und Dunkel-Modus, 11 Farben, ARGB-Farbwähler mit Schiebereglern + Hex-Eingabe + Echtzeit-Vorschau
 - 🔤 **Schriftgröße** einstellbar (8–16 sp)
+- ⏱️ **Gesprächsdauer** optional als eigene schmale Spalte am rechten Rand einblendbar
 - 🌍 **Mehrsprachig**: Deutsch, Englisch, Französisch, Spanisch
 
 ---
@@ -119,6 +120,7 @@ Ein anpassbares Android-Homescreen-Widget, das das Anrufprotokoll deiner FRITZ!B
 | Sprache | System · Deutsch · English · Français · Español |
 | Erscheinungsbild | System · Hell · Dunkel |
 | Schriftgröße | 8 · 9 · 10 · **11** · 12 · 13 · 14 · 16 sp |
+| Gesprächsdauer anzeigen | Ein / **Aus** |
 
 ### Widget-Farben (je 11 für Hell- und Dunkel-Modus)
 

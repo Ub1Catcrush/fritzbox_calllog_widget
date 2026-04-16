@@ -195,10 +195,13 @@ class CallLogWidget : AppWidgetProvider() {
         views.setInt(R.id.col_header_row, "setBackgroundColor", colors.colHeaderBg)
 
         // Header texts
-        views.setTextColor(R.id.tv_widget_title, colors.headerText)
-        views.setTextColor(R.id.tv_col_date,     colors.colHeaderText)
-        views.setTextColor(R.id.tv_col_time,     colors.colHeaderText)
-        views.setTextColor(R.id.tv_col_name,     colors.colHeaderText)
+        views.setTextColor(R.id.tv_widget_title,    colors.headerText)
+        views.setTextColor(R.id.tv_col_date,        colors.colHeaderText)
+        views.setTextColor(R.id.tv_col_time,        colors.colHeaderText)
+        views.setTextColor(R.id.tv_col_name,        colors.colHeaderText)
+        views.setTextColor(R.id.tv_col_duration,    colors.colHeaderText)
+        views.setViewVisibility(R.id.tv_col_duration,
+            if (prefs.showDuration) View.VISIBLE else View.GONE)
 
         // Column header text (use filter label when not "all")
         val filterLabel = filterLabel(ctx, prefs.callFilter)
@@ -333,21 +336,26 @@ class CallLogWidget : AppWidgetProvider() {
             val row = RemoteViews(pkg, R.layout.widget_call_row)
             row.setTextViewText(R.id.tv_date, entry.date.format(dateFmt))
             row.setTextViewText(R.id.tv_time, entry.date.format(timeFmt))
+            row.setTextViewText(R.id.tv_name, entry.displayName)
 
-            // Name + optional duration
-            val nameText = if (showDuration && entry.duration > 0) {
+            // Duration column: show as own narrow column when enabled
+            if (showDuration && entry.duration > 0) {
                 val mins = entry.duration / 60
                 val secs = entry.duration % 60
-                "${entry.displayName}  ${mins}:${"%02d".format(secs)}"
-            } else entry.displayName
-            row.setTextViewText(R.id.tv_name, nameText)
+                row.setTextViewText(R.id.tv_duration, "%d:%02d".format(mins, secs))
+                row.setViewVisibility(R.id.tv_duration, View.VISIBLE)
+            } else {
+                row.setViewVisibility(R.id.tv_duration, View.GONE)
+            }
 
             row.setTextColor(R.id.tv_date, colors.textPrimary)
             row.setTextColor(R.id.tv_time, colors.textSecondary)
             row.setTextColor(R.id.tv_name, colors.textPrimary)
+            row.setTextColor(R.id.tv_duration, colors.textSecondary)
             row.setTextViewTextSize(R.id.tv_date, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
             row.setTextViewTextSize(R.id.tv_time, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
             row.setTextViewTextSize(R.id.tv_name, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
+            row.setTextViewTextSize(R.id.tv_duration, TypedValue.COMPLEX_UNIT_SP, fontSizeSp)
             row.setImageViewResource(R.id.iv_call_type, when (entry.type) {
                 CallType.INCOMING         -> R.drawable.ic_call_incoming
                 CallType.OUTGOING         -> R.drawable.ic_call_outgoing
