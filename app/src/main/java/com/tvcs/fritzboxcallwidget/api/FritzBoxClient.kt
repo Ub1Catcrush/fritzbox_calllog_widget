@@ -306,19 +306,45 @@ class FritzBoxClient(
 
     // ── Parsers ───────────────────────────────────────────────────────────────
 
-    private fun parseCallListCsv(csv: String): List<FritzCallEntry> =
-        csv.lines().drop(1).filter { it.isNotBlank() }.mapNotNull { line ->
-            val c = line.split(";")
-            if (c.size < 6) null
-            else FritzCallEntry(
-                type = c.getOrNull(0)?.trim()?.toIntOrNull() ?: 0,
-                date = c.getOrNull(1)?.trim() ?: "",
-                name = c.getOrNull(2)?.trim() ?: "",
-                caller = c.getOrNull(3)?.trim() ?: "",
-                called = c.getOrNull(5)?.trim() ?: "",
-                duration = c.getOrNull(6)?.trim() ?: ""
-            )
+    private fun parseCallListCsv(csv: String): List<FritzCallEntry> {
+        try {
+            val entries: List<FritzCallEntry> = csv.lines()
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.startsWith("Typ") }
+                .mapNotNull { line ->
+                    val c = (line as java.lang.String).split(";", -1).map { it.trim() }
+
+                if (c.size < 8) return@mapNotNull null
+
+                // The MyFRITZ CSV uses a different type numbering than the TR-064 XML:
+                // We remap here so that mapEntry() in CallRepository can use a single
+                // consistent code path for both CSV and XML entries.
+                val csvType = c[0].trim().toIntOrNull() ?: return@mapNotNull null
+                val xmlType = when (csvType) {
+                    1 -> 1   // Eingehend / AB bleibt Typ 1
+                    2 -> 2   // Missed bleibt Typ 2
+                    3 -> 10  // Blocked -> XML-Standard für abgewiesen ist meist 10
+                    4 -> 3   // Ausgehend -> XML-Standard ist 3
+                    else -> csvType
+                }
+
+                FritzCallEntry(
+                    type = xmlType,
+                    date = c[1].trim(),
+                    name = c[2].trim(),
+                    caller = c[3].trim(),
+                    called = c[3].trim(),
+                    duration = c[7].trim()
+                )
+            }
+
+            return entries
         }
+        catch (e: Exception)
+        {
+            throw FritzBoxException("Parse-Fehler (${e.javaClass.simpleName}): ${e.message}")
+        }
+    }
 
     private fun parseCallListXml(xml: String): List<FritzCallEntry> {
         val doc = parseXml(xml)

@@ -227,8 +227,29 @@ class CallRepository(private val prefs: AppPreferences) {
                 type   = type,
                 name   = raw.name.takeIf { it.isNotBlank() },
                 number = applyPrefix(rawNumber, prefix),
-                duration = (raw.duration.toDoubleOrNull() ?: 0.0).times(100.0).times(60.0).toInt()
+                duration = parseDurationToSeconds(raw.duration)
         )
+    }
+
+    /**
+     * Parses a FritzBox duration string to total seconds.
+     *
+     * Both the TR-064 XML and the MyFRITZ CSV return duration in "MM:SS" format
+     * (e.g. "3:42" = 3 minutes 42 seconds = 222 seconds).
+     * The previous code used `toDoubleOrNull()` which always returned null for
+     * this format, resulting in every call showing duration 0.
+     */
+    private fun parseDurationToSeconds(raw: String): Int {
+        val trimmed = raw.trim()
+        return if (trimmed.contains(':')) {
+            val parts = trimmed.split(':')
+            val minutes = parts.getOrNull(0)?.toIntOrNull() ?: 0
+            val seconds = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            minutes * 60 + seconds
+        } else {
+            // Fallback: plain number treated as seconds
+            trimmed.toIntOrNull() ?: 0
+        }
     }
 
     private fun applyPrefix(number: String, prefix: String): String {
