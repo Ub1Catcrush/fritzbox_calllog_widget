@@ -37,6 +37,13 @@
         <EditTextPreference android:key="pref_refresh"      android:title="@string/pref_refresh_title"     android:summary="@string/pref_refresh_summary"     android:defaultValue="300" android:inputType="number" app:iconSpaceReserved="false"/>
         <EditTextPreference android:key="pref_max_entries"  android:title="@string/pref_max_entries_title" android:summary="@string/pref_max_entries_summary" android:defaultValue="20"  android:inputType="number" app:iconSpaceReserved="false"/>
         <EditTextPreference android:key="pref_phone_prefix" android:title="@string/pref_prefix_title"     android:summary="@string/pref_prefix_summary"     android:defaultValue=""    android:inputType="phone"  app:iconSpaceReserved="false"/>
+        <EditTextPreference
+            android:key="pref_local_area_code"
+            android:title="@string/pref_area_code_title"
+            android:summary="@string/pref_area_code_summary"
+            android:defaultValue=""
+            android:inputType="phone"
+            app:iconSpaceReserved="false"/>
     </PreferenceCategory>
 
     <!-- Display -->

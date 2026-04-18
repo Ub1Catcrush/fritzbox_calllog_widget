@@ -49,8 +49,10 @@
     <string name="pref_refresh_summary">How often to fetch the call log. Minimum recommended: 60</string>
     <string name="pref_max_entries_title">Maximum entries</string>
     <string name="pref_max_entries_summary">Number of calls shown in the widget</string>
-    <string name="pref_prefix_title">Phone number prefix</string>
+    <string name="pref_prefix_title">Country prefix</string>
     <string name="pref_prefix_summary">Replaces leading 0 (e.g. +49 → 0621… becomes +4921…)</string>
+    <string name="pref_area_code_title">Local area code</string>
+    <string name="pref_area_code_summary">Prepended to numbers without leading 0 (e.g. 0621 + 12345 → 062112345), before country prefix</string>
     <!-- Display prefs -->
     <string name="pref_language_title">Language</string>
     <string name="pref_theme_title">Appearance</string>

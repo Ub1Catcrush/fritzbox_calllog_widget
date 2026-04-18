@@ -155,7 +155,7 @@ class CallRepository(private val prefs: AppPreferences) {
                 val client = FritzBoxClient(profile, prefs.fritzUsername, prefs.fritzPassword)
                 val rawEntries = client.getCallList()
                 val entries = rawEntries.mapNotNull { raw ->
-                    try { mapEntry(raw, prefs.phonePrefix) }
+                    try { mapEntry(raw, prefs.phonePrefix, prefs.localAreaCode) }
                     catch (e: Exception) {
                         Log.w(TAG, "Skipping unparseable entry: $raw", e)
                         null
@@ -184,7 +184,7 @@ class CallRepository(private val prefs: AppPreferences) {
 
     // ── Entry mapping ─────────────────────────────────────────────────────────
 
-    private fun mapEntry(raw: FritzBoxClient.FritzCallEntry, prefix: String): CallEntry {
+    private fun mapEntry(raw: FritzBoxClient.FritzCallEntry, prefix: String, areaCode: String): CallEntry {
         // Determine CallType from FritzBox type code, port, and numbertype.
         //
         // Type codes:
@@ -226,7 +226,7 @@ class CallRepository(private val prefs: AppPreferences) {
                 date   = date,
                 type   = type,
                 name   = raw.name.takeIf { it.isNotBlank() },
-                number = applyPrefix(rawNumber, prefix),
+                number = applyPrefix(rawNumber, prefix, areaCode),
                 duration = parseDurationToSeconds(raw.duration)
         )
     }
@@ -252,10 +252,28 @@ class CallRepository(private val prefs: AppPreferences) {
         }
     }
 
-    private fun applyPrefix(number: String, prefix: String): String {
-        if (prefix.isBlank()) return number
+    /**
+     * Normalises a number using two optional prefixes:
+     *  1. [areaCode] is prepended when the number has no leading 0, + or 00
+     *     (i.e. it is a pure extension/local number like "12345").
+     *     After prepending the area code the number starts with 0 so the
+     *     country-prefix step below will handle it correctly.
+     *  2. [prefix] (country prefix, e.g. "+49") replaces the leading 0.
+     *     Skipped when blank or when the number already starts with + / 00.
+     */
+    private fun applyPrefix(number: String, prefix: String, areaCode: String): String {
+        // Numbers already in international format are left untouched.
         if (number.startsWith("+") || number.startsWith("00")) return number
-        if (number.startsWith("0")) return prefix + number.removePrefix("0")
-        return prefix + number
+
+        // Pure local numbers (no leading 0): prepend area code first.
+        val withArea = if (!number.startsWith("0") && areaCode.isNotBlank())
+            areaCode + number
+        else
+            number
+
+        // Now apply the country prefix (replaces leading 0).
+        if (prefix.isBlank()) return withArea
+        if (withArea.startsWith("0")) return prefix + withArea.removePrefix("0")
+        return withArea
     }
 }

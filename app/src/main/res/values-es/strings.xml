@@ -44,8 +44,10 @@
     <string name="pref_refresh_summary">Frecuencia de obtención del registro. Mínimo recomendado: 60</string>
     <string name="pref_max_entries_title">Entradas máximas</string>
     <string name="pref_max_entries_summary">Número de llamadas mostradas en el widget</string>
-    <string name="pref_prefix_title">Prefijo de número</string>
+    <string name="pref_prefix_title">Prefijo de país</string>
     <string name="pref_prefix_summary">Reemplaza el 0 inicial (ej. +34 → 0621… se convierte en +34621…)</string>
+	<string name="pref_area_code_title">Código de área local</string>
+	<string name="pref_area_code_summary">Se añade a números sin el 0 inicial (ej. 0621 + 12345 → 062112345), antes del prefijo de país</string>
     <string name="pref_language_title">Idioma</string>
     <string name="pref_theme_title">Apariencia</string>
     <string name="pref_font_family_title">Fuente</string>

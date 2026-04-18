@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +39,20 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     class SettingsFragment : PreferenceFragmentCompat() {
+
+        // ── Activity Result API — replaces deprecated requestPermissions / onRequestPermissionsResult
+        private val notificationPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (!granted) {
+                // User denied — turn the switch back off
+                AppPreferences(requireContext()).missedCallNotificationsEnabled = false
+                findPreference<androidx.preference.SwitchPreferenceCompat>(
+                    AppPreferences.KEY_MISSED_NOTIFICATIONS)?.isChecked = false
+                Toast.makeText(requireContext(),
+                    R.string.notif_permission_denied, Toast.LENGTH_LONG).show()
+            }
+        }
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.preferences, rootKey)
@@ -118,6 +133,7 @@ class SettingsActivity : AppCompatActivity() {
                 AppPreferences.KEY_USERNAME,
                 AppPreferences.KEY_PASSWORD,
                 AppPreferences.KEY_PHONE_PREFIX,
+                AppPreferences.KEY_LOCAL_AREA_CODE,
                 AppPreferences.KEY_REFRESH,
                 AppPreferences.KEY_MAX_ENTRIES
             ).forEach { key ->
@@ -204,38 +220,15 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         private fun requestNotificationPermissionIfNeeded() {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (requireContext().checkSelfPermission(
                         android.Manifest.permission.POST_NOTIFICATIONS
                     ) != android.content.pm.PackageManager.PERMISSION_GRANTED
                 ) {
-                    requestPermissions(
-                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                        REQUEST_NOTIFICATION_PERMISSION
-                    )
+                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         }
-
-        override fun onRequestPermissionsResult(
-            requestCode: Int, permissions: Array<String>, grantResults: IntArray
-        ) {
-            if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
-                val granted = grantResults.firstOrNull() ==
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-                if (!granted) {
-                    // User denied — turn the switch back off
-                    AppPreferences(requireContext()).missedCallNotificationsEnabled = false
-                    findPreference<androidx.preference.SwitchPreferenceCompat>(
-                        AppPreferences.KEY_MISSED_NOTIFICATIONS)?.isChecked = false
-                    Toast.makeText(requireContext(),
-                        R.string.notif_permission_denied, Toast.LENGTH_LONG).show()
-                }
-            }
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        }
-
-        companion object { private const val REQUEST_NOTIFICATION_PERMISSION = 200 }
 
         private fun scheduleWidgetRefresh() {
             lifecycleScope.launch {

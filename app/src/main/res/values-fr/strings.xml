@@ -44,8 +44,10 @@
     <string name="pref_refresh_summary">Fréquence de récupération du journal. Minimum recommandé : 60</string>
     <string name="pref_max_entries_title">Entrées maximum</string>
     <string name="pref_max_entries_summary">Nombre d\'appels affichés dans le widget</string>
-    <string name="pref_prefix_title">Préfixe téléphonique</string>
+	<string name="pref_prefix_title">Préfixe de pays</string>
     <string name="pref_prefix_summary">Remplace le 0 initial (ex. +33 → 0621… devient +33621…)</string>
+	<string name="pref_area_code_title">Indicatif régional local</string>
+	<string name="pref_area_code_summary">Ajouté aux numéros sans le 0 initial (ex. 0621 + 12345 → 062112345), avant el préfixe de pays</string>
     <string name="pref_language_title">Langue</string>
     <string name="pref_theme_title">Apparence</string>
     <string name="pref_font_family_title">Police</string>

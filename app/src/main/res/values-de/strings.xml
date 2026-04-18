@@ -44,8 +44,10 @@
     <string name="pref_refresh_summary">Wie oft soll die Anrufliste abgerufen werden? Minimum empfohlen: 60</string>
     <string name="pref_max_entries_title">Maximale Einträge</string>
     <string name="pref_max_entries_summary">Anzahl der im Widget angezeigten Anrufe</string>
-    <string name="pref_prefix_title">Telefonnummern-Präfix</string>
+    <string name="pref_prefix_title">Ländervorwahl</string>
     <string name="pref_prefix_summary">Ersetzt führende 0 (z.B. +49 → 0621… wird zu +4921…)</string>
+    <string name="pref_area_code_title">Ortsvorwahl</string>
+    <string name="pref_area_code_summary">Wird vor Nummern ohne führende 0 gestellt (z.B. 0621 + 12345 → 062112345), vor dem Länderprefix</string>
     <string name="pref_language_title">Sprache</string>
     <string name="pref_theme_title">Erscheinungsbild</string>
     <string name="pref_font_family_title">Schriftart</string>

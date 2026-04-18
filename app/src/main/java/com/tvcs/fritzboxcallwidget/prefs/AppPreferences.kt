@@ -45,6 +45,15 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_PHONE_PREFIX, "") ?: ""
         set(v) = prefs.edit().putString(KEY_PHONE_PREFIX, v).apply()
 
+    /**
+     * Local area code (Ortsvorwahl) prepended to numbers that start with a
+     * digit other than '0' and do not already begin with '+' or '00'.
+     * Applied before [phonePrefix]. Example: "0621" + "12345" → "062112345".
+     */
+    var localAreaCode: String
+        get() = prefs.getString(KEY_LOCAL_AREA_CODE, "") ?: ""
+        set(v) = prefs.edit().putString(KEY_LOCAL_AREA_CODE, v).apply()
+
     var maxEntries: Int
         get() = prefs.getString(KEY_MAX_ENTRIES, "20")?.toIntOrNull() ?: 20
         set(v) = prefs.edit().putString(KEY_MAX_ENTRIES, v.toString()).apply()
@@ -235,6 +244,7 @@ class AppPreferences(context: Context) {
         const val KEY_PASSWORD               = "pref_password"
         const val KEY_REFRESH                = "pref_refresh"
         const val KEY_PHONE_PREFIX           = "pref_phone_prefix"
+        const val KEY_LOCAL_AREA_CODE        = "pref_local_area_code"
         const val KEY_MAX_ENTRIES            = "pref_max_entries"
         const val KEY_THEME                  = "pref_theme"
         const val KEY_LANGUAGE               = "pref_language"
