@@ -10,7 +10,7 @@
         <EditTextPreference
             android:key="pref_username"
             android:title="@string/pref_username_title"
-            android:summary="@string/pref_username_summary"
+            app:useSimpleSummaryProvider="true"
             android:defaultValue=""
             android:inputType="text"
             app:iconSpaceReserved="false"/>
@@ -34,13 +34,13 @@
 
     <!-- Refresh / Data -->
     <PreferenceCategory android:title="@string/pref_category_refresh" app:iconSpaceReserved="false">
-        <EditTextPreference android:key="pref_refresh"      android:title="@string/pref_refresh_title"     android:summary="@string/pref_refresh_summary"     android:defaultValue="300" android:inputType="number" app:iconSpaceReserved="false"/>
-        <EditTextPreference android:key="pref_max_entries"  android:title="@string/pref_max_entries_title" android:summary="@string/pref_max_entries_summary" android:defaultValue="20"  android:inputType="number" app:iconSpaceReserved="false"/>
-        <EditTextPreference android:key="pref_phone_prefix" android:title="@string/pref_prefix_title"     android:summary="@string/pref_prefix_summary"     android:defaultValue=""    android:inputType="phone"  app:iconSpaceReserved="false"/>
+        <EditTextPreference android:key="pref_refresh"      android:title="@string/pref_refresh_title"     app:useSimpleSummaryProvider="true"     android:defaultValue="300" android:inputType="number" app:iconSpaceReserved="false"/>
+        <EditTextPreference android:key="pref_max_entries"  android:title="@string/pref_max_entries_title" app:useSimpleSummaryProvider="true" android:defaultValue="20"  android:inputType="number" app:iconSpaceReserved="false"/>
+        <EditTextPreference android:key="pref_phone_prefix" android:title="@string/pref_prefix_title"     app:useSimpleSummaryProvider="true"     android:defaultValue=""    android:inputType="phone"  app:iconSpaceReserved="false"/>
         <EditTextPreference
             android:key="pref_local_area_code"
             android:title="@string/pref_area_code_title"
-            android:summary="@string/pref_area_code_summary"
+            app:useSimpleSummaryProvider="true"
             android:defaultValue=""
             android:inputType="phone"
             app:iconSpaceReserved="false"/>
@@ -134,7 +134,7 @@
         <EditTextPreference
             android:key="pref_click_to_dial_ext"
             android:title="@string/pref_click_to_dial_ext_title"
-            android:summary="@string/pref_click_to_dial_ext_summary"
+            app:useSimpleSummaryProvider="true"
             android:defaultValue=""
             android:inputType="phone"
             android:visible="false"

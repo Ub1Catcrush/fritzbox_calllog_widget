@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
@@ -58,6 +59,19 @@ class SettingsActivity : AppCompatActivity() {
             setPreferencesFromResource(R.xml.preferences, rootKey)
             seedColorPickers()
             wireChangeListeners()
+            setupPasswordSummary()
+        }
+
+        // ── Password summary: show bullets when set, hint text when empty ─────
+
+        private fun setupPasswordSummary() {
+            findPreference<EditTextPreference>(AppPreferences.KEY_PASSWORD)?.let { pref ->
+                pref.summaryProvider = Preference.SummaryProvider<EditTextPreference> {
+                    val v = AppPreferences(requireContext()).fritzPassword
+                    if (v.isBlank()) getString(R.string.pref_password_summary)
+                    else "\u2022".repeat(8)   // ••••••••
+                }
+            }
         }
 
         // ── Seed pickers with current stored (or default) colors ──────────────

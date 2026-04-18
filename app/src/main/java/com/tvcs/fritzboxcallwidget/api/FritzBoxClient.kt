@@ -312,7 +312,7 @@ class FritzBoxClient(
                 .map { it.trim() }
                 .filter { it.isNotBlank() && !it.startsWith("Typ") }
                 .mapNotNull { line ->
-                    val c = (line as java.lang.String).split(";", -1).map { it.trim() }
+                    val c = line.split(";".toRegex(), -1).map { it.trim() }
 
                 if (c.size < 8) return@mapNotNull null
 
