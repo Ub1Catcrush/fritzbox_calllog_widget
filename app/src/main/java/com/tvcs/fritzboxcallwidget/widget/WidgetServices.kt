@@ -1,146 +1,176 @@
 package com.tvcs.fritzboxcallwidget.widget
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.tvcs.fritzboxcallwidget.R
+import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
+import com.tvcs.fritzboxcallwidget.prefs.SettingsActivity
 
 // ── BootReceiver ──────────────────────────────────────────────────────────────
 
-/**
- * Handles device (re)boot. Declared statically in the manifest so the OS
- * can deliver the broadcast even when the app is not running.
- *
- * Restores the AlarmManager layer (WorkManager reschedules itself) and
- * enqueues a one-shot staleness-check refresh.
- */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == "android.intent.action.QUICKBOOT_POWERON") {
-            Log.d("BootReceiver", "Boot completed — rescheduling and refreshing")
-            WidgetScheduler.schedule(context)
-            WidgetScheduler.refreshIfStale(context)
+        val action = intent.action ?: return
+        if (action == Intent.ACTION_BOOT_COMPLETED ||
+            action == "android.intent.action.QUICKBOOT_POWERON") {
+            Log.d("BootReceiver", "Boot — rescheduling alarm + starting foreground service")
+            WidgetScheduler.scheduleExactAlarm(context)
+            WidgetForegroundService.start(context)
         }
     }
 }
 
-// ── ScreenOnReceiver ──────────────────────────────────────────────────────────
+// ── PowerReceiver (statisch, Exemption-Liste) ─────────────────────────────────
 
-/**
- * Receives ACTION_SCREEN_ON and ACTION_USER_PRESENT.
- *
- * IMPORTANT: these broadcasts are only deliverable to a statically-declared
- * receiver in the manifest on Android 8+ IF the receiver is declared on the
- * widget's AppWidgetProvider *or* on a separate receiver entry — they cannot
- * be reliably received by a background Service that has been killed by Doze.
- *
- * This receiver is declared statically in the manifest (see below) so the OS
- * wakes the app specifically to deliver it, even after 45+ minutes of screen-off.
- *
- * NOTE: ACTION_SCREEN_ON cannot actually be declared statically since Android 8
- * for most apps — but AppWidgetProvider receivers ARE exempt from this restriction
- * because they are considered "app widget broadcast receivers". We register this
- * as a *separate* receiver element in the manifest with the protected-broadcast
- * exemption annotation. On devices where it is blocked, the AlarmManager / WorkManager
- * periodic path still guarantees eventual delivery.
- */
-class ScreenOnReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action ?: return
-        Log.d("ScreenOnReceiver", "Received: $action")
-        WidgetScheduler.refreshIfStale(context)
-    }
-}
-
-// ── PowerReceiver ─────────────────────────────────────────────────────────────
-
-/**
- * Receives POWER_CONNECTED / POWER_DISCONNECTED.
- *
- * These CAN be declared statically in the manifest (they are exempt from the
- * Android 8 implicit broadcast restriction — see
- * https://developer.android.com/guide/components/broadcast-exceptions).
- */
 class PowerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action ?: return
-        Log.d("PowerReceiver", "Received: $action")
+        Log.d("PowerReceiver", "Power event: ${intent.action}")
         WidgetScheduler.refreshIfStale(context)
+        // Re-arm the exact alarm since power state change may affect scheduling
+        WidgetScheduler.scheduleExactAlarm(context)
     }
 }
 
-// ── NetworkChangeReceiver ─────────────────────────────────────────────────────
+// ── WidgetForegroundService ───────────────────────────────────────────────────
+//
+// WHY A FOREGROUND SERVICE?
+//
+// ACTION_SCREEN_ON is explicitly NOT on Android 8+'s static-receiver exemption
+// list. It is a "protected broadcast" but Android only delivers it to processes
+// that are already running. After 45 minutes of screen-off, Doze kills all
+// background processes — so a static receiver never fires for SCREEN_ON.
+//
+// A ForegroundService survives Doze because the OS exempts it from process
+// death (it shows a persistent notification as the trade-off).
+// Inside the running service we register SCREEN_ON dynamically — reliably.
+//
+// The notification is placed in a low-importance, silent channel so it appears
+// only in the notification shade pull-down, not as a heads-up popup. Users can
+// additionally hide it in system settings if desired.
 
-/**
- * Receives CONNECTIVITY_ACTION (deprecated but still delivered statically on
- * API < 28) and acts as the static fallback for network-available events.
- *
- * On API 28+ we rely on the ConnectivityManager.NetworkCallback registered in
- * [EventTriggerService] instead. Both paths call [WidgetScheduler.refreshIfStale]
- * so double-firing is harmless.
- */
-class NetworkChangeReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        Log.d("NetworkChangeReceiver", "Network changed")
-        WidgetScheduler.refreshIfStale(context)
-    }
-}
+class WidgetForegroundService : Service() {
 
-// ── EventTriggerService ───────────────────────────────────────────────────────
+    companion object {
+        private const val TAG          = "WidgetFgService"
+        private const val CHANNEL_ID   = "widget_refresh_service"
+        private const val NOTIF_ID     = 9001
 
-/**
- * Registers a [ConnectivityManager.NetworkCallback] for API 28+ network-available
- * events and re-registers the screen-on receiver dynamically as a belt-and-suspenders
- * fallback for when the static receiver is not invoked.
- *
- * This service is started by [CallLogWidget.onEnabled] and stopped by
- * [CallLogWidget.onDisabled]. It uses START_STICKY so the OS restarts it after
- * killing it under memory pressure.
- *
- * The static receivers ([ScreenOnReceiver], [PowerReceiver], [NetworkChangeReceiver])
- * are the reliable path; this service is the supplementary dynamic path.
- */
-class EventTriggerService : Service() {
+        fun start(context: Context) {
+            val intent = Intent(context, WidgetForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
 
-    private val dynamicReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            Log.d("EventTriggerService", "Dynamic trigger: ${intent.action}")
-            WidgetScheduler.refreshIfStale(context)
+        fun stop(context: Context) {
+            context.stopService(Intent(context, WidgetForegroundService::class.java))
         }
     }
-    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    private val screenOnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action ?: return
+            Log.d(TAG, "Screen/unlock event: $action")
+            // On SCREEN_ON just re-arm the alarm so it fires promptly.
+            // On USER_PRESENT (unlock) we do the actual staleness-check refresh.
+            when (action) {
+                Intent.ACTION_SCREEN_ON   -> WidgetScheduler.scheduleExactAlarm(context)
+                Intent.ACTION_USER_PRESENT -> WidgetScheduler.refreshIfStale(context)
+                Intent.ACTION_SCREEN_OFF  -> {
+                    // Screen turned off: cancel the running alarm to avoid
+                    // unnecessary wake-locks while the screen is off, then
+                    // schedule a single wake-up for when the interval expires
+                    // so data is fresh when the user turns the screen on again.
+                    WidgetScheduler.scheduleExactAlarm(context)
+                }
+            }
+        }
+    }
+
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate() {
         super.onCreate()
-        registerDynamicReceiver()
+        createNotificationChannel()
+        startForeground(NOTIF_ID, buildNotification())
+        registerScreenReceiver()
         registerNetworkCallback()
-        Log.d("EventTriggerService", "Service created")
+        Log.d(TAG, "Foreground service started")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
         super.onDestroy()
-        runCatching { unregisterReceiver(dynamicReceiver) }
+        runCatching { unregisterReceiver(screenOnReceiver) }
         unregisterNetworkCallback()
-        Log.d("EventTriggerService", "Service destroyed")
+        Log.d(TAG, "Foreground service stopped")
     }
 
-    private fun registerDynamicReceiver() {
-        val filter = android.content.IntentFilter().apply {
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    // ── Notification ─────────────────────────────────────────────────────────
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.service_channel_name),
+                NotificationManager.IMPORTANCE_MIN   // silent, no heads-up, no sound
+            ).apply {
+                setShowBadge(false)
+                description = getString(R.string.service_channel_desc)
+            }
+            getSystemService(NotificationManager::class.java)
+                ?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val openSettings = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, SettingsActivity::class.java),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            else PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_call_incoming)
+            .setContentTitle(getString(R.string.service_notif_title))
+            .setContentText(getString(R.string.service_notif_text))
+            .setContentIntent(openSettings)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setOngoing(true)
+            .setSilent(true)
+            .build()
+    }
+
+    // ── Dynamic receivers ─────────────────────────────────────────────────────
+
+    private fun registerScreenReceiver() {
+        val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
         }
-        registerReceiver(dynamicReceiver, filter)
+        registerReceiver(screenOnReceiver, filter)
     }
 
     private fun registerNetworkCallback() {
@@ -150,8 +180,8 @@ class EventTriggerService : Service() {
             .build()
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.d("EventTriggerService", "Network available")
-                WidgetScheduler.refreshIfStale(this@EventTriggerService)
+                Log.d(TAG, "Network available — refresh if stale")
+                WidgetScheduler.refreshIfStale(this@WidgetForegroundService)
             }
         }
         cm.registerNetworkCallback(request, cb)
@@ -165,7 +195,7 @@ class EventTriggerService : Service() {
     }
 }
 
-// ── WidgetUpdateService (legacy stub, kept for manifest compat) ───────────────
+// ── WidgetUpdateService (legacy stub) ─────────────────────────────────────────
 
 class WidgetUpdateService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null

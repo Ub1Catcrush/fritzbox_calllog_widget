@@ -88,11 +88,25 @@
     <!-- Advanced / optional features -->
     <PreferenceCategory android:title="@string/pref_category_advanced" app:iconSpaceReserved="false">
 
-        <!-- Exact alarm permission banner (shown only when permission missing on Android 12+) -->
+        <!-- Permission / system setting banners (shown only when action needed) -->
         <Preference
             android:key="pref_exact_alarm_hint"
             android:title="@string/pref_exact_alarm_title"
             android:summary="@string/pref_exact_alarm_summary"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
+        <Preference
+            android:key="pref_battery_hint"
+            android:title="@string/pref_battery_hint_title"
+            android:summary="@string/pref_battery_hint_summary"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
+        <Preference
+            android:key="pref_notif_perm_hint"
+            android:title="@string/pref_notif_perm_title"
+            android:summary="@string/pref_notif_perm_summary"
             android:visible="false"
             app:iconSpaceReserved="false"/>
 

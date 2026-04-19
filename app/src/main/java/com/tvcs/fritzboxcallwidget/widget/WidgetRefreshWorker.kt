@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
+import com.tvcs.fritzboxcallwidget.widget.WidgetScheduler
 
 /**
  * WorkManager worker that drives widget refreshes.
@@ -40,7 +41,10 @@ class WidgetRefreshWorker(
         if (lastMs > 0L && elapsedMs < intervalMs) {
             Log.d(TAG, "Skipping refresh — only ${elapsedMs / 1000}s since last update " +
                   "(interval ${prefs.refreshIntervalSeconds}s)")
-            return Result.success()
+            // Re-arm exact alarm so the self-rescheduling chain continues
+        WidgetScheduler.scheduleExactAlarm(context)
+
+        return Result.success()
         }
 
         // ── Reset connection fallback ─────────────────────────────────────────
@@ -54,6 +58,9 @@ class WidgetRefreshWorker(
 
         // lastSuccessfulRefreshMs is set by CallLogWidget.fetchAndUpdate on
         // successful fetch, so we don't update it here.
+        // Re-arm exact alarm so the self-rescheduling chain continues
+        WidgetScheduler.scheduleExactAlarm(context)
+
         return Result.success()
     }
 }

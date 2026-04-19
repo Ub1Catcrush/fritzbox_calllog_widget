@@ -63,6 +63,7 @@ class CallLogWidget : AppWidgetProvider() {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        WidgetForegroundService.start(context)
         for (id in ids) showLoading(context, manager, id)
         val pendingResult = goAsync()
         scope.launch {
@@ -136,14 +137,10 @@ class CallLogWidget : AppWidgetProvider() {
     override fun onEnabled(context: Context)  {
         WidgetScheduler.schedule(context)
         MissedCallWorker.createNotificationChannel(context)
-        // Start the event-trigger service that listens for screen-on,
-        // USB, network-available etc.
-        context.startService(Intent(context, EventTriggerService::class.java))
     }
     override fun onDisabled(context: Context) {
         WidgetScheduler.cancel(context)
         MissedCallWorker.cancel(context)
-        context.stopService(Intent(context, EventTriggerService::class.java))
     }
 
     // ── State ─────────────────────────────────────────────────────────────────

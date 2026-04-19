@@ -114,6 +114,14 @@
     <string name="pref_category_advanced">Erweiterte Funktionen</string>
     <string name="pref_exact_alarm_title">⚠ Berechtigung für genaue Alarme fehlt</string>
     <string name="pref_exact_alarm_summary">Tippen zum Öffnen der Systemeinstellungen. Ohne diese Berechtigung können Aktualisierungsintervalle ungenau sein.</string>
+    <string name="pref_battery_hint_title">⚠ Akkuoptimierung aktiv</string>
+    <string name="pref_battery_hint_summary">Diese App wird akkuoptimiert. Tippen, um sie auszunehmen – sonst funktioniert die Hintergrundaktualisierung nicht zuverlässig.</string>
+    <string name="pref_notif_perm_title">⚠ Benachrichtigungsberechtigung fehlt</string>
+    <string name="pref_notif_perm_summary">Tippen, um die Berechtigung zu erteilen – für Benachrichtigungen bei verpassten Anrufen und den Hintergrundservice.</string>
+    <string name="service_channel_name">Widget-Aktualisierungsservice</string>
+    <string name="service_channel_desc">Hält das Fritz!Box Anrufprotokoll-Widget aktuell</string>
+    <string name="service_notif_title">Fritz!Box Anrufprotokoll</string>
+    <string name="service_notif_text">Hintergrundaktualisierung aktiv</string>
     <string name="pref_show_duration_title">Gesprächsdauer anzeigen</string>
     <string name="pref_show_duration_summary">Dauer hinter Name/Nummer anzeigen (z.B. 2:35)</string>
     <string name="pref_show_last_updated_title">Letzte Aktualisierung anzeigen</string>

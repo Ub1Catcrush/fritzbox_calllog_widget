@@ -124,6 +124,14 @@
     <string name="pref_category_advanced">Advanced features</string>
     <string name="pref_exact_alarm_title">⚠ Exact alarm permission missing</string>
     <string name="pref_exact_alarm_summary">Tap to allow exact alarms in system settings. Without this, refresh intervals may be imprecise.</string>
+    <string name="pref_battery_hint_title">⚠ Battery optimisation active</string>
+    <string name="pref_battery_hint_summary">This app is battery-optimised. Tap to exempt it so background refresh works reliably.</string>
+    <string name="pref_notif_perm_title">⚠ Notification permission missing</string>
+    <string name="pref_notif_perm_summary">Tap to grant notification permission — required for missed-call alerts and the background refresh service.</string>
+    <string name="service_channel_name">Widget refresh service</string>
+    <string name="service_channel_desc">Keeps the Fritz!Box call log widget up to date</string>
+    <string name="service_notif_title">Fritz!Box Call Log</string>
+    <string name="service_notif_text">Background refresh active</string>
     <string name="pref_show_duration_title">Show call duration</string>
     <string name="pref_show_duration_summary">Display duration after name/number (e.g. 2:35)</string>
     <string name="pref_show_last_updated_title">Show last updated time</string>

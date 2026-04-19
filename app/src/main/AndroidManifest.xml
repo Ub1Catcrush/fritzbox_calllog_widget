@@ -7,8 +7,13 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- API 31-32: requires user grant via system settings -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- API 33+: auto-granted, no user interaction needed -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-feature
         android:name="android.hardware.telephony"
@@ -96,28 +101,18 @@
         </receiver>
 
     
-        <!-- Event-trigger service: supplementary dynamic NetworkCallback -->
+        <!-- Foreground service: keeps process alive for reliable SCREEN_ON reception -->
+        <service
+            android:name="com.tvcs.fritzboxcallwidget.widget.WidgetForegroundService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Legacy event-trigger service (supplementary) -->
         <service
             android:name="com.tvcs.fritzboxcallwidget.widget.EventTriggerService"
             android:exported="false"
             android:stopWithTask="false" />
-
-        <!--
-             Static receiver for ACTION_SCREEN_ON / ACTION_USER_PRESENT.
-             Android 8+ restricts implicit broadcasts, but these two actions
-             are on the exemption list (they are "protected broadcasts" that
-             the system sends to ALL receivers regardless of target-SDK).
-             Declaring them here ensures the OS can wake our process after
-             screen-off / Doze without needing a running service.
-        -->
-        <receiver
-            android:name="com.tvcs.fritzboxcallwidget.widget.ScreenOnReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.SCREEN_ON" />
-                <action android:name="android.intent.action.USER_PRESENT" />
-            </intent-filter>
-        </receiver>
 
         <!--
              Static receiver for power events.
@@ -131,6 +126,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
                 <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+                <action android:name="android.intent.action.CHARGING" />
             </intent-filter>
         </receiver>
 

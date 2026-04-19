@@ -7,73 +7,118 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
-import java.util.concurrent.TimeUnit
 
 /**
- * Manages the widget refresh schedule using a two-layer strategy:
+ * Widget refresh scheduler.
  *
- *  1. **WorkManager periodic job** — the primary scheduler.
- *     Survives Doze, App Standby, reboots, and process death.
- *     Interval mirrors [AppPreferences.refreshIntervalSeconds] (minimum 15 min
- *     due to WorkManager constraints; shorter intervals are served by layer 2).
+ * Strategy: setExactAndAllowWhileIdle + WorkManager one-shot
+ * ──────────────────────────────────────────────────────────
  *
- *  2. **AlarmManager** — kept as a supplementary exact-alarm layer for
- *     sub-15-minute intervals and for users who have granted SCHEDULE_EXACT_ALARM.
- *     When exact alarms are unavailable the alarm is still set inexactly as a
- *     best-effort ping, but WorkManager is the authoritative trigger.
+ * setRepeating / setInexactRepeating are throttled heavily by Doze and
+ * App Standby — they can be delayed by hours. WorkManager periodic jobs
+ * are also deferred during Doze.
  *
- * Both layers call [CallLogWidget.ACTION_REFRESH] which honours staleness:
- * a refresh is only executed when more than [AppPreferences.refreshIntervalSeconds]
- * have elapsed since [AppPreferences.lastSuccessfulRefreshMs].
+ * The only alarm type guaranteed to fire even during Doze is
+ * setExactAndAllowWhileIdle (or setAlarmClock). We use a self-rescheduling
+ * chain: each alarm fires → BroadcastReceiver → refreshIfStale() →
+ * [WidgetRefreshWorker] → scheduleExactAlarm() for the next tick.
+ *
+ * This means we need USE_EXACT_ALARM (API 33+, granted automatically) or
+ * SCHEDULE_EXACT_ALARM (API 31-32, requires user grant). We request both.
+ *
+ * WorkManager is kept as a belt-and-suspenders fallback for when the alarm
+ * chain breaks (first install, reboot before first alarm fires, etc.).
  */
 object WidgetScheduler {
 
-    private const val TAG              = "WidgetScheduler"
-    private const val ALARM_RC         = 42
-    private const val WORK_NAME_PERIODIC = "widget_refresh_periodic"
+    private const val TAG     = "WidgetScheduler"
+    private const val ALARM_RC = 42
 
     // ── Public API ────────────────────────────────────────────────────────────
 
+    /** Full schedule: exact alarm chain + WorkManager fallback + foreground service. */
     fun schedule(context: Context) {
-        scheduleWorkManager(context)
-        scheduleAlarm(context)
+        scheduleExactAlarm(context)
+        WidgetForegroundService.start(context)
     }
 
     fun cancel(context: Context) {
-        cancelAlarm(context)
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME_PERIODIC)
-        Log.d(TAG, "Widget refresh cancelled (alarm + WorkManager)")
+        cancelExactAlarm(context)
+        WorkManager.getInstance(context).cancelAllWorkByTag(TAG)
+        WidgetForegroundService.stop(context)
+        Log.d(TAG, "All refresh scheduling cancelled")
     }
 
-    /**
-     * Reschedule both layers after the interval preference changes.
-     * Cancels any existing work/alarm then re-enqueues with the new interval.
-     */
     fun reschedule(context: Context) {
-        cancel(context)
-        schedule(context)
+        cancelExactAlarm(context)
+        scheduleExactAlarm(context)
     }
 
     /**
-     * Returns true if exact alarms are available.
-     * On API < 31 always true; on API 31+ depends on user permission.
+     * Schedule (or re-arm) a single exact alarm for one interval from now.
+     * Called after each alarm fires so the chain continues, and on SCREEN_ON
+     * so the next tick is always close to the configured interval.
      */
+    fun scheduleExactAlarm(context: Context) {
+        val prefs      = AppPreferences(context)
+        val intervalMs = prefs.refreshIntervalSeconds.toLong() * 1_000L
+        val triggerMs  = System.currentTimeMillis() + intervalMs
+
+        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pi = buildAlarmPendingIntent(context)
+        am.cancel(pi)
+
+        when {
+            // API 33+: USE_EXACT_ALARM — no user permission needed
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
+                Log.d(TAG, "Exact alarm (API33+) in ${prefs.refreshIntervalSeconds}s")
+            }
+            // API 31-32: SCHEDULE_EXACT_ALARM — check user grant
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                if (am.canScheduleExactAlarms()) {
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
+                    Log.d(TAG, "Exact alarm (API31-32, granted) in ${prefs.refreshIntervalSeconds}s")
+                } else {
+                    // Fall back to inexact — user hasn't granted permission yet
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
+                    Log.w(TAG, "Inexact alarm fallback — SCHEDULE_EXACT_ALARM not granted")
+                }
+            }
+            // API 26-30: setExactAndAllowWhileIdle always available
+            else -> {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
+                Log.d(TAG, "Exact alarm (API<31) in ${prefs.refreshIntervalSeconds}s")
+            }
+        }
+    }
+
+    /**
+     * Enqueue a one-shot WorkManager job that performs a staleness check and
+     * refreshes the widget if the interval has elapsed. No network constraint
+     * so cached data is displayed immediately on screen-on.
+     */
+    fun refreshIfStale(context: Context) {
+        val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
+            .addTag(TAG)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+        // Re-arm the alarm so the chain continues from now
+        scheduleExactAlarm(context)
+        Log.d(TAG, "refreshIfStale enqueued")
+    }
+
+    // ── Permission helpers ────────────────────────────────────────────────────
+
     fun canScheduleExactAlarms(context: Context): Boolean {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        return canScheduleExactAlarms(am)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms()
+        else true
     }
 
-    /**
-     * Returns an Intent that opens the system settings page for exact alarm
-     * permissions (Android 12+ only). Returns null on older versions.
-     */
     fun requestExactAlarmPermissionIntent(context: Context): Intent? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
         return Intent(
@@ -82,67 +127,12 @@ object WidgetScheduler {
         )
     }
 
-    // ── WorkManager layer ─────────────────────────────────────────────────────
+    // ── Internal ──────────────────────────────────────────────────────────────
 
-    private fun scheduleWorkManager(context: Context) {
-        val prefs       = AppPreferences(context)
-        val intervalSec = prefs.refreshIntervalSeconds.toLong()
-
-        // WorkManager minimum is 15 minutes; clamp upward.
-        val wmIntervalMin = maxOf(15L, intervalSec / 60L)
-
-        val request = PeriodicWorkRequestBuilder<WidgetRefreshWorker>(
-            wmIntervalMin, TimeUnit.MINUTES
-        ).setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-        ).build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            WORK_NAME_PERIODIC,
-            ExistingPeriodicWorkPolicy.UPDATE,   // re-enqueue with new interval on reschedule
-            request
-        )
-        Log.d(TAG, "WorkManager periodic refresh scheduled every ${wmIntervalMin}min")
-    }
-
-    // ── AlarmManager layer ────────────────────────────────────────────────────
-
-    private fun scheduleAlarm(context: Context) {
-        val prefs      = AppPreferences(context)
-        val intervalMs = prefs.refreshIntervalSeconds.toLong() * 1_000L
-        val am         = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val pi         = buildAlarmPendingIntent(context)
-        am.cancel(pi)
-
-        val exact = canScheduleExactAlarms(am)
-        if (exact) {
-            am.setRepeating(
-                AlarmManager.RTC,
-                System.currentTimeMillis() + intervalMs,
-                intervalMs,
-                pi
-            )
-        } else {
-            am.setInexactRepeating(
-                AlarmManager.RTC,
-                System.currentTimeMillis() + intervalMs,
-                maxOf(intervalMs, AlarmManager.INTERVAL_FIFTEEN_MINUTES),
-                pi
-            )
-        }
-        Log.d(TAG, "Alarm set every ${prefs.refreshIntervalSeconds}s (exact=$exact)")
-    }
-
-    private fun cancelAlarm(context: Context) {
+    private fun cancelExactAlarm(context: Context) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.cancel(buildAlarmPendingIntent(context))
     }
-
-    private fun canScheduleExactAlarms(am: AlarmManager): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms()
-        else true
 
     private fun buildAlarmPendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, CallLogWidget::class.java).apply {
@@ -150,31 +140,7 @@ object WidgetScheduler {
         }
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-        else
-            PendingIntent.FLAG_UPDATE_CURRENT
+        else PendingIntent.FLAG_UPDATE_CURRENT
         return PendingIntent.getBroadcast(context, ALARM_RC, intent, flags)
-    }
-
-    // ── One-shot "refresh if stale" ───────────────────────────────────────────
-
-    /**
-     * Enqueues a one-time WorkManager job that refreshes the widget only when
-     * the last successful refresh is older than the configured interval.
-     * Used by event triggers (screen-on, USB, network change, boot).
-     */
-    /**
-     * Enqueues a one-shot [WidgetRefreshWorker] job.
-     *
-     * No network constraint is set here: the worker itself performs a staleness
-     * check and calls [CallLogWidget.triggerRefresh], which first renders the
-     * cached data immediately (no network needed) and then fetches fresh data
-     * in the background.  Removing the constraint means the job runs right on
-     * screen-on — before Wi-Fi has necessarily reconnected — so the user sees
-     * up-to-date cached content instantly.
-     */
-    fun refreshIfStale(context: Context) {
-        val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>().build()
-        WorkManager.getInstance(context).enqueue(request)
-        Log.d(TAG, "One-shot refresh-if-stale enqueued (no network constraint)")
     }
 }
