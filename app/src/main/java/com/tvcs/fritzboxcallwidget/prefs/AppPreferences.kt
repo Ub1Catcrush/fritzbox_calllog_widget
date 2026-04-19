@@ -133,6 +133,24 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_LAST_SEEN_CALL_ID, "") ?: ""
         set(v) = prefs.edit().putString(KEY_LAST_SEEN_CALL_ID, v).apply()
 
+    /**
+     * Timestamp (epoch ms) of the last successful widget data refresh.
+     * Written by CallLogWidget after a successful fetch; read by
+     * WidgetRefreshWorker for staleness checks.
+     */
+    var lastSuccessfulRefreshMs: Long
+        get() = prefs.getLong(KEY_LAST_REFRESH_MS, 0L)
+        set(v) = prefs.edit().putLong(KEY_LAST_REFRESH_MS, v).apply()
+
+    /**
+     * Index of the connection profile that should be tried first on the
+     * next fetch attempt.  Reset to 0 before each fresh fetch cycle so
+     * the highest-priority profile is always tried first.
+     */
+    var activeProfileFallbackIndex: Int
+        get() = prefs.getInt(KEY_ACTIVE_PROFILE_IDX, 0)
+        set(v) = prefs.edit().putInt(KEY_ACTIVE_PROFILE_IDX, v).apply()
+
     // ── Call type filter helper ────────────────────────────────────────────────
 
     /** Returns the set of CallTypes that should be shown based on [callFilter]. */
@@ -259,6 +277,8 @@ class AppPreferences(context: Context) {
         const val KEY_PHONEBOOK_LOOKUP       = "pref_phonebook_lookup"
         const val KEY_MISSED_NOTIFICATIONS   = "pref_missed_notifications"
         const val KEY_LAST_SEEN_CALL_ID      = "pref_last_seen_call_id"
+        const val KEY_LAST_REFRESH_MS        = "pref_last_refresh_ms"
+        const val KEY_ACTIVE_PROFILE_IDX     = "pref_active_profile_idx"
 
         const val KEY_LIGHT_HEADER_BG        = "pref_color_header_bg"
         const val KEY_LIGHT_HEADER_TEXT      = "pref_color_header_text"

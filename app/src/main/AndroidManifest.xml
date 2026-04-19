@@ -90,10 +90,18 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- HTC/OnePlus quick-boot (soft reboot) -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 
     
+        <!-- Event-trigger service: listens for screen-on, USB, network events -->
+        <service
+            android:name="com.tvcs.fritzboxcallwidget.widget.EventTriggerService"
+            android:exported="false"
+            android:stopWithTask="false" />
+
         <!-- WorkManager initialization provider (auto-initialised by WorkManager) -->
         <provider
             android:name="androidx.startup.InitializationProvider"

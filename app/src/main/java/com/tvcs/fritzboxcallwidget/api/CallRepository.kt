@@ -91,7 +91,12 @@ class CallRepository(private val prefs: AppPreferences) {
 
         var lastError: Throwable? = null
 
-        for (profile in profiles) {
+        // Respect the fallback-reset: start from profile index 0 if reset,
+        // otherwise continue from where the last attempt left off.
+        val startIdx = prefs.activeProfileFallbackIndex.coerceIn(0, profiles.lastIndex)
+        val orderedProfiles = profiles.drop(startIdx) + profiles.take(startIdx)
+
+        for (profile in orderedProfiles) {
             if (profile.host.isBlank()) {
                 onProgress(Progress(
                     "${profile.displayName}: Adresse nicht konfiguriert — übersprungen",
@@ -121,11 +126,17 @@ class CallRepository(private val prefs: AppPreferences) {
                     ?: enriched
 
                 cachedEntriesRef.set(enriched)  // cache unfiltered for widget resize
+                prefs.activeProfileFallbackIndex = 0  // reset for next fresh cycle
                 onProgress(Progress("${filtered.size} Anrufe geladen von ${profile.displayName}"))
                 return@withContext Result.success(filtered)
             }
 
             lastError = result.exceptionOrNull()
+            // Advance fallback index so the next trigger skips this failed profile
+            val currentIdx = profiles.indexOf(profile)
+            if (currentIdx >= 0 && currentIdx + 1 < profiles.size) {
+                prefs.activeProfileFallbackIndex = currentIdx + 1
+            }
             onProgress(Progress(
                 "${profile.displayName} fehlgeschlagen: ${lastError?.message}",
                 isError = true

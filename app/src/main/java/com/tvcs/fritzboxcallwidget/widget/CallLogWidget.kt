@@ -110,10 +110,14 @@ class CallLogWidget : AppWidgetProvider() {
     override fun onEnabled(context: Context)  {
         WidgetScheduler.schedule(context)
         MissedCallWorker.createNotificationChannel(context)
+        // Start the event-trigger service that listens for screen-on,
+        // USB, network-available etc.
+        context.startService(Intent(context, EventTriggerService::class.java))
     }
     override fun onDisabled(context: Context) {
         WidgetScheduler.cancel(context)
         MissedCallWorker.cancel(context)
+        context.stopService(Intent(context, EventTriggerService::class.java))
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -152,6 +156,8 @@ class CallLogWidget : AppWidgetProvider() {
             val result = repo.fetchCallLog(context)
             val state = result.fold(
                 onSuccess = { calls ->
+                    // Record the successful fetch time for staleness checks
+                    prefs.lastSuccessfulRefreshMs = System.currentTimeMillis()
                     State.Success(calls.take(prefs.maxEntries))
                 },
                 onFailure = { error ->
