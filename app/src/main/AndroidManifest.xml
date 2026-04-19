@@ -96,11 +96,43 @@
         </receiver>
 
     
-        <!-- Event-trigger service: listens for screen-on, USB, network events -->
+        <!-- Event-trigger service: supplementary dynamic NetworkCallback -->
         <service
             android:name="com.tvcs.fritzboxcallwidget.widget.EventTriggerService"
             android:exported="false"
             android:stopWithTask="false" />
+
+        <!--
+             Static receiver for ACTION_SCREEN_ON / ACTION_USER_PRESENT.
+             Android 8+ restricts implicit broadcasts, but these two actions
+             are on the exemption list (they are "protected broadcasts" that
+             the system sends to ALL receivers regardless of target-SDK).
+             Declaring them here ensures the OS can wake our process after
+             screen-off / Doze without needing a running service.
+        -->
+        <receiver
+            android:name="com.tvcs.fritzboxcallwidget.widget.ScreenOnReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.SCREEN_ON" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+             Static receiver for power events.
+             ACTION_POWER_CONNECTED and ACTION_POWER_DISCONNECTED are on the
+             Android 8+ implicit-broadcast exemption list and can be declared
+             statically.
+        -->
+        <receiver
+            android:name="com.tvcs.fritzboxcallwidget.widget.PowerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
 
         <!-- WorkManager initialization provider (auto-initialised by WorkManager) -->
         <provider

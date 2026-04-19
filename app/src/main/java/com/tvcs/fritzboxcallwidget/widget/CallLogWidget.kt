@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -37,6 +38,9 @@ class CallLogWidget : AppWidgetProvider() {
             "all", "missed", "incoming", "outgoing", "blocked", "voicemail", "fax"
         )
 
+        // Application-level scope for widget work that must outlive onReceive().
+        // goAsync() below keeps the BroadcastReceiver process alive while the
+        // coroutine is running, preventing the OS from killing the job mid-fetch.
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         fun triggerRefresh(context: Context) {
@@ -60,7 +64,11 @@ class CallLogWidget : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         for (id in ids) showLoading(context, manager, id)
-        fetchAndUpdate(context, manager, ids)
+        val pendingResult = goAsync()
+        scope.launch {
+            try { fetchAndUpdateSuspend(context, manager, ids) }
+            finally { pendingResult.finish() }
+        }
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -73,7 +81,11 @@ class CallLogWidget : AppWidgetProvider() {
             updateWidget(context, manager, id,
                 State.Success(filtered.take(prefs.maxEntries)), prefs)
         } else {
-            fetchAndUpdate(context, manager, intArrayOf(id))
+            val pendingResult = goAsync()
+            scope.launch {
+                try { fetchAndUpdateSuspend(context, manager, intArrayOf(id)) }
+                finally { pendingResult.finish() }
+            }
         }
     }
 
@@ -85,7 +97,17 @@ class CallLogWidget : AppWidgetProvider() {
                 val ids = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
                     ?: manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
                 for (id in ids) showLoading(context, manager, id)
-                fetchAndUpdate(context, manager, ids)
+                // goAsync() tells Android to keep this process alive until
+                // pendingResult.finish() is called — without it the OS may
+                // kill the process before the coroutine fetch completes.
+                val pendingResult = goAsync()
+                scope.launch {
+                    try {
+                        fetchAndUpdateSuspend(context, manager, ids)
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
             }
             ACTION_NEXT_FILTER -> {
                 // Cycle to next filter value and refresh display from cache
@@ -101,7 +123,11 @@ class CallLogWidget : AppWidgetProvider() {
                         updateWidget(context, manager, id,
                             State.Success(filtered.take(prefs.maxEntries)), prefs)
                 } else {
-                    fetchAndUpdate(context, manager, ids)
+                    val pr2 = goAsync()
+                    scope.launch {
+                        try { fetchAndUpdateSuspend(context, manager, ids) }
+                        finally { pr2.finish() }
+                    }
                 }
             }
         }
@@ -140,8 +166,8 @@ class CallLogWidget : AppWidgetProvider() {
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
 
-    private fun fetchAndUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        scope.launch {
+    private suspend fun fetchAndUpdateSuspend(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        run {
             val prefs = AppPreferences(context)
             val repo  = CallRepository(prefs)
 

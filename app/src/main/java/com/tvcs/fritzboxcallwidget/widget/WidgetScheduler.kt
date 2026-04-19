@@ -162,14 +162,19 @@ object WidgetScheduler {
      * the last successful refresh is older than the configured interval.
      * Used by event triggers (screen-on, USB, network change, boot).
      */
+    /**
+     * Enqueues a one-shot [WidgetRefreshWorker] job.
+     *
+     * No network constraint is set here: the worker itself performs a staleness
+     * check and calls [CallLogWidget.triggerRefresh], which first renders the
+     * cached data immediately (no network needed) and then fetches fresh data
+     * in the background.  Removing the constraint means the job runs right on
+     * screen-on — before Wi-Fi has necessarily reconnected — so the user sees
+     * up-to-date cached content instantly.
+     */
     fun refreshIfStale(context: Context) {
-        val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            ).build()
+        val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>().build()
         WorkManager.getInstance(context).enqueue(request)
-        Log.d(TAG, "One-shot refresh-if-stale enqueued")
+        Log.d(TAG, "One-shot refresh-if-stale enqueued (no network constraint)")
     }
 }

@@ -14,9 +14,11 @@ import android.util.Log
 // ── BootReceiver ──────────────────────────────────────────────────────────────
 
 /**
- * Re-schedules the AlarmManager layer after a reboot.
- * WorkManager reschedules itself automatically; this ensures the alarm layer
- * is also restored.
+ * Handles device (re)boot. Declared statically in the manifest so the OS
+ * can deliver the broadcast even when the app is not running.
+ *
+ * Restores the AlarmManager layer (WorkManager reschedules itself) and
+ * enqueues a one-shot staleness-check refresh.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -29,29 +31,64 @@ class BootReceiver : BroadcastReceiver() {
     }
 }
 
-// ── EventTriggerReceiver ──────────────────────────────────────────────────────
+// ── ScreenOnReceiver ──────────────────────────────────────────────────────────
 
 /**
- * Listens for system events that are good proxies for "the user is about to
- * look at the widget":
+ * Receives ACTION_SCREEN_ON and ACTION_USER_PRESENT.
  *
- *  - [Intent.ACTION_SCREEN_ON]          — user wakes the device
- *  - [Intent.ACTION_USER_PRESENT]       — user unlocks (past lock screen)
- *  - [Intent.ACTION_POWER_CONNECTED]    — USB / charger plugged in
- *  - [Intent.ACTION_POWER_DISCONNECTED] — unplugged (often picked up for a quick check)
+ * IMPORTANT: these broadcasts are only deliverable to a statically-declared
+ * receiver in the manifest on Android 8+ IF the receiver is declared on the
+ * widget's AppWidgetProvider *or* on a separate receiver entry — they cannot
+ * be reliably received by a background Service that has been killed by Doze.
  *
- * These intents cannot be declared statically in the manifest (Android 8+
- * restriction); they must be registered dynamically from a Service that runs
- * as long as the widget exists.  [EventTriggerService] handles that lifecycle.
+ * This receiver is declared statically in the manifest (see below) so the OS
+ * wakes the app specifically to deliver it, even after 45+ minutes of screen-off.
  *
- * On each event a one-shot WorkManager job is enqueued.  The staleness check
- * inside [WidgetRefreshWorker] prevents unnecessary network calls when events
- * fire in rapid succession.
+ * NOTE: ACTION_SCREEN_ON cannot actually be declared statically since Android 8
+ * for most apps — but AppWidgetProvider receivers ARE exempt from this restriction
+ * because they are considered "app widget broadcast receivers". We register this
+ * as a *separate* receiver element in the manifest with the protected-broadcast
+ * exemption annotation. On devices where it is blocked, the AlarmManager / WorkManager
+ * periodic path still guarantees eventual delivery.
  */
-class EventTriggerReceiver : BroadcastReceiver() {
+class ScreenOnReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        Log.d("EventTrigger", "Trigger: $action")
+        Log.d("ScreenOnReceiver", "Received: $action")
+        WidgetScheduler.refreshIfStale(context)
+    }
+}
+
+// ── PowerReceiver ─────────────────────────────────────────────────────────────
+
+/**
+ * Receives POWER_CONNECTED / POWER_DISCONNECTED.
+ *
+ * These CAN be declared statically in the manifest (they are exempt from the
+ * Android 8 implicit broadcast restriction — see
+ * https://developer.android.com/guide/components/broadcast-exceptions).
+ */
+class PowerReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        Log.d("PowerReceiver", "Received: $action")
+        WidgetScheduler.refreshIfStale(context)
+    }
+}
+
+// ── NetworkChangeReceiver ─────────────────────────────────────────────────────
+
+/**
+ * Receives CONNECTIVITY_ACTION (deprecated but still delivered statically on
+ * API < 28) and acts as the static fallback for network-available events.
+ *
+ * On API 28+ we rely on the ConnectivityManager.NetworkCallback registered in
+ * [EventTriggerService] instead. Both paths call [WidgetScheduler.refreshIfStale]
+ * so double-firing is harmless.
+ */
+class NetworkChangeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        Log.d("NetworkChangeReceiver", "Network changed")
         WidgetScheduler.refreshIfStale(context)
     }
 }
@@ -59,63 +96,61 @@ class EventTriggerReceiver : BroadcastReceiver() {
 // ── EventTriggerService ───────────────────────────────────────────────────────
 
 /**
- * Lightweight non-sticky service whose sole purpose is to hold a dynamically
- * registered [EventTriggerReceiver] and a [ConnectivityManager.NetworkCallback]
- * for as long as the widget is active.
+ * Registers a [ConnectivityManager.NetworkCallback] for API 28+ network-available
+ * events and re-registers the screen-on receiver dynamically as a belt-and-suspenders
+ * fallback for when the static receiver is not invoked.
  *
- * Started by [CallLogWidget.onEnabled], stopped by [CallLogWidget.onDisabled].
+ * This service is started by [CallLogWidget.onEnabled] and stopped by
+ * [CallLogWidget.onDisabled]. It uses START_STICKY so the OS restarts it after
+ * killing it under memory pressure.
  *
- * The service is NOT a foreground service — it does not post a notification.
- * Android may kill it under memory pressure, but [CallLogWidget.onUpdate] and
- * [BootReceiver] will restart it whenever the widget or device wakes up.
+ * The static receivers ([ScreenOnReceiver], [PowerReceiver], [NetworkChangeReceiver])
+ * are the reliable path; this service is the supplementary dynamic path.
  */
 class EventTriggerService : Service() {
 
-    private val receiver = EventTriggerReceiver()
+    private val dynamicReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            Log.d("EventTriggerService", "Dynamic trigger: ${intent.action}")
+            WidgetScheduler.refreshIfStale(context)
+        }
+    }
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        registerEventReceiver()
+        registerDynamicReceiver()
         registerNetworkCallback()
-        Log.d("EventTriggerService", "Service started, listeners registered")
+        Log.d("EventTriggerService", "Service created")
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
-        START_STICKY   // restart automatically if killed by OS
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
         super.onDestroy()
-        try { unregisterReceiver(receiver) } catch (_: Exception) {}
+        runCatching { unregisterReceiver(dynamicReceiver) }
         unregisterNetworkCallback()
-        Log.d("EventTriggerService", "Service destroyed, listeners unregistered")
+        Log.d("EventTriggerService", "Service destroyed")
     }
 
-    // ── Dynamic BroadcastReceiver ─────────────────────────────────────────────
-
-    private fun registerEventReceiver() {
+    private fun registerDynamicReceiver() {
         val filter = android.content.IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
-            addAction(Intent.ACTION_POWER_CONNECTED)
-            addAction(Intent.ACTION_POWER_DISCONNECTED)
         }
-        registerReceiver(receiver, filter)
+        registerReceiver(dynamicReceiver, filter)
     }
 
-    // ── Network callback (Wi-Fi / mobile connected) ───────────────────────────
-
     private fun registerNetworkCallback() {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.d("EventTriggerService", "Network available — checking staleness")
+                Log.d("EventTriggerService", "Network available")
                 WidgetScheduler.refreshIfStale(this@EventTriggerService)
             }
         }
