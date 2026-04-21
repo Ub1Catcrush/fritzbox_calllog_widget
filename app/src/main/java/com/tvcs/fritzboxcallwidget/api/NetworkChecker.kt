@@ -5,6 +5,9 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.PowerManager
+import android.util.Log
+import java.net.InetSocketAddress
+import java.net.Socket
 
 /**
  * Checks the device's network and power state before attempting any
@@ -20,12 +23,24 @@ import android.os.PowerManager
  *   3. Data Saver (restrictBackground) active — metered background traffic
  *      is blocked; only whitelisted apps bypass this
  *
+ * Additionally, [isHostReachable] performs a fast TCP-level probe so
+ * callers can detect VPN or WiFi networks that have no route to the
+ * FritzBox — before committing to the full HTTP fetch.  This prevents
+ * the widget from hanging and avoids the Android ANR dialog when the
+ * device is connected to a network but the FritzBox is unreachable
+ * (e.g. corporate VPN, public WiFi without LAN access).
+ *
  * Note: we cannot know for certain whether *this* app is whitelisted in
  * either saver mode, so we report RESTRICTED rather than NO_NETWORK and
  * let the user decide.  The fetch is still attempted; the warning is
  * informational to help diagnose unexpected failures.
  */
 object NetworkChecker {
+
+    private const val TAG = "NetworkChecker"
+
+    /** Timeout for the TCP reachability probe in milliseconds. */
+    private const val TCP_PROBE_TIMEOUT_MS = 3_000
 
     sealed class NetworkState {
         /** Network is available and not known to be restricted. */
@@ -85,6 +100,46 @@ object NetworkChecker {
                 NetworkState.Restricted(NetworkState.Restricted.Reason.DATA_SAVER)
             else ->
                 NetworkState.Available
+        }
+    }
+
+    /**
+     * Performs a fast TCP-level reachability probe against [host]:[port].
+     *
+     * This is intentionally a **blocking** call — always invoke it from a
+     * background thread or inside `withContext(Dispatchers.IO)`.
+     *
+     * Why TCP and not ICMP ping?
+     *   - Android requires ROOT or a special manifest permission for raw
+     *     ICMP sockets.  A TCP connect to the target port is both
+     *     permission-free and more meaningful: it confirms that the exact
+     *     service endpoint (not just IP-layer routing) is available.
+     *
+     * Typical scenarios where Android reports "Connected" but this returns false:
+     *   - VPN is active and routes traffic away from the local LAN
+     *     (FritzBox at 192.168.x.x is no longer reachable)
+     *   - Connected to a public / guest WiFi that has no route to the
+     *     FritzBox
+     *   - The FritzBox itself is offline or on a different subnet
+     *
+     * @param host  Hostname or IP address of the FritzBox.
+     * @param port  Port to probe (e.g. 49000 for TR-064, 443 for HTTPS).
+     * @param timeoutMs  Maximum wait in milliseconds (default [TCP_PROBE_TIMEOUT_MS]).
+     * @return `true` if a TCP connection could be established, `false` otherwise.
+     */
+    fun isHostReachable(
+        host: String,
+        port: Int,
+        timeoutMs: Int = TCP_PROBE_TIMEOUT_MS
+    ): Boolean {
+        return try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, port), timeoutMs)
+                true
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Host unreachable — $host:$port (${e.javaClass.simpleName}: ${e.message})")
+            false
         }
     }
 

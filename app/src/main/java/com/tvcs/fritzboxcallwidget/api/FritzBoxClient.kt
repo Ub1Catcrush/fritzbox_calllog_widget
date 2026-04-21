@@ -62,8 +62,8 @@ class FritzBoxClient(
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)   // TCP probe already verified reachability;
+            .readTimeout(30, TimeUnit.SECONDS)      // short connect avoids ANR if probe races
             .writeTimeout(15, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .apply {

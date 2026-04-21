@@ -108,12 +108,6 @@
             android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- Legacy event-trigger service (supplementary) -->
-        <service
-            android:name="com.tvcs.fritzboxcallwidget.widget.EventTriggerService"
-            android:exported="false"
-            android:stopWithTask="false" />
-
         <!--
              Static receiver for power events.
              ACTION_POWER_CONNECTED and ACTION_POWER_DISCONNECTED are on the

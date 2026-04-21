@@ -25,6 +25,13 @@ import com.tvcs.fritzboxcallwidget.api.PhonebookRepository
  *     but we try anyway so the widget stays useful on a best-effort basis.
  *   - [NetworkChecker.NetworkState.Available]   → proceed normally.
  *
+ * Per-profile TCP probe: before each HTTP fetch, [NetworkChecker.isHostReachable]
+ * opens a short-lived TCP socket to the profile's host:port (3 s timeout).
+ * If the probe fails the profile is skipped immediately without starting any
+ * HTTP request.  This prevents the widget from hanging — and avoids the Android
+ * ANR dialog — when the device is on a network that has no route to the FritzBox
+ * (e.g. VPN active, public WiFi, or no LAN connection).
+ *
  * Thread safety: [cachedEntriesRef] uses AtomicReference for safe concurrent
  * read/write (@Volatile alone is insufficient for check-then-set patterns).
  *
@@ -102,6 +109,27 @@ class CallRepository(private val prefs: AppPreferences) {
                     "${profile.displayName}: Adresse nicht konfiguriert — übersprungen",
                     isError = true
                 ))
+                continue
+            }
+
+            // ── TCP reachability probe ─────────────────────────────────────────
+            // Before making any HTTP request, verify that the host is actually
+            // reachable at TCP level.  This catches the common case where Android
+            // reports "Connected" (e.g. VPN active, or WiFi without LAN access)
+            // but the FritzBox is not reachable on the current network — which
+            // would otherwise cause the widget to hang for up to connectTimeout
+            // seconds and trigger an Android ANR dialog.
+            val reachable = NetworkChecker.isHostReachable(profile.host, profile.port)
+            if (!reachable) {
+                val msg = "${profile.displayName}: Host ${profile.host}:${profile.port} " +
+                          "nicht erreichbar (VPN oder kein LAN-Zugang?) — übersprungen"
+                onProgress(Progress(msg, isError = true))
+                Log.w(TAG, msg)
+                val currentIdx = profiles.indexOf(profile)
+                if (currentIdx >= 0 && currentIdx + 1 < profiles.size) {
+                    prefs.activeProfileFallbackIndex = currentIdx + 1
+                }
+                lastError = Exception(msg)
                 continue
             }
 
