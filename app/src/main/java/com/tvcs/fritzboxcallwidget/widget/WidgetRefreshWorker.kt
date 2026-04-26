@@ -17,10 +17,6 @@ import com.tvcs.fritzboxcallwidget.widget.WidgetScheduler
  *
  * On success [AppPreferences.lastSuccessfulRefreshMs] is updated so the next
  * trigger can correctly decide whether to fetch.
- *
- * Connection fallback reset: before each fetch attempt the profile-iteration
- * index is reset to 0 so all profiles are tried fresh rather than starting from
- * the last-failed profile.
  */
 class WidgetRefreshWorker(
     private val context: Context,
@@ -47,10 +43,6 @@ class WidgetRefreshWorker(
         return Result.success()
         }
 
-        // ── Reset connection fallback ─────────────────────────────────────────
-        // Ensure every fresh fetch attempt starts with the highest-priority
-        // profile instead of the last-failed one.
-        prefs.activeProfileFallbackIndex = 0
         Log.d(TAG, "Refreshing widget (elapsed ${elapsedMs / 1000}s)")
 
         // ── Trigger widget update ─────────────────────────────────────────────

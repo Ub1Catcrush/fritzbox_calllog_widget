@@ -26,18 +26,13 @@ import com.tvcs.fritzboxcallwidget.api.PhonebookRepository
  *   - [NetworkChecker.NetworkState.Available]   → proceed normally.
  *
  * Per-profile TCP probe: before each HTTP fetch, [NetworkChecker.isHostReachable]
- * opens a short-lived TCP socket to the profile's host:port (3 s timeout).
+ * opens a short-lived TCP socket to the profile's host:port (1 s timeout).
  * If the probe fails the profile is skipped immediately without starting any
- * HTTP request.  This prevents the widget from hanging — and avoids the Android
- * ANR dialog — when the device is on a network that has no route to the FritzBox
- * (e.g. VPN active, public WiFi, or no LAN connection).
+ * HTTP request. The next profile is tried automatically — this is the staged
+ * connect mechanism (e.g. LAN fails → MyFRITZ is tried next).
  *
  * Thread safety: [cachedEntriesRef] uses AtomicReference for safe concurrent
  * read/write (@Volatile alone is insufficient for check-then-set patterns).
- *
- * Retry strategy: exponential backoff (2 s / 4 s / 8 s) per profile.
- * Cache policy: errors never clear the cache — last successful result is
- * always returned as a fallback.
  */
 class CallRepository(private val prefs: AppPreferences) {
 
@@ -98,12 +93,7 @@ class CallRepository(private val prefs: AppPreferences) {
 
         var lastError: Throwable? = null
 
-        // Respect the fallback-reset: start from profile index 0 if reset,
-        // otherwise continue from where the last attempt left off.
-        val startIdx = prefs.activeProfileFallbackIndex.coerceIn(0, profiles.lastIndex)
-        val orderedProfiles = profiles.drop(startIdx) + profiles.take(startIdx)
-
-        for (profile in orderedProfiles) {
+        for (profile in profiles) {
             if (profile.host.isBlank()) {
                 onProgress(Progress(
                     "${profile.displayName}: Adresse nicht konfiguriert — übersprungen",
@@ -125,10 +115,6 @@ class CallRepository(private val prefs: AppPreferences) {
                           "nicht erreichbar (VPN oder kein LAN-Zugang?) — übersprungen"
                 onProgress(Progress(msg, isError = true))
                 Log.w(TAG, msg)
-                val currentIdx = profiles.indexOf(profile)
-                if (currentIdx >= 0 && currentIdx + 1 < profiles.size) {
-                    prefs.activeProfileFallbackIndex = currentIdx + 1
-                }
                 lastError = Exception(msg)
                 continue
             }
@@ -154,17 +140,11 @@ class CallRepository(private val prefs: AppPreferences) {
                     ?: enriched
 
                 cachedEntriesRef.set(enriched)  // cache unfiltered for widget resize
-                prefs.activeProfileFallbackIndex = 0  // reset for next fresh cycle
                 onProgress(Progress("${filtered.size} Anrufe geladen von ${profile.displayName}"))
                 return@withContext Result.success(filtered)
             }
 
             lastError = result.exceptionOrNull()
-            // Advance fallback index so the next trigger skips this failed profile
-            val currentIdx = profiles.indexOf(profile)
-            if (currentIdx >= 0 && currentIdx + 1 < profiles.size) {
-                prefs.activeProfileFallbackIndex = currentIdx + 1
-            }
             onProgress(Progress(
                 "${profile.displayName} fehlgeschlagen: ${lastError?.message}",
                 isError = true
