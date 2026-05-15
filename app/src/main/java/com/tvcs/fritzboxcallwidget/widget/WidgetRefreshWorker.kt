@@ -1,22 +1,29 @@
 package com.tvcs.fritzboxcallwidget.widget
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.tvcs.fritzboxcallwidget.api.CallRepository
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
-import com.tvcs.fritzboxcallwidget.widget.WidgetScheduler
 
 /**
  * WorkManager worker that drives widget refreshes.
+ *
+ * The worker performs the fetch directly (not via Broadcast) so the result
+ * is guaranteed to land before the worker finishes — Broadcasts sent from
+ * workers can be deferred or dropped by Doze before the worker's process
+ * ends.
  *
  * Staleness check: the widget is only refreshed when the elapsed time since
  * [AppPreferences.lastSuccessfulRefreshMs] exceeds [AppPreferences.refreshIntervalSeconds].
  * This prevents redundant network calls when multiple triggers fire in a short
  * window (e.g. screen-on shortly after an alarm-manager tick).
  *
- * On success [AppPreferences.lastSuccessfulRefreshMs] is updated so the next
- * trigger can correctly decide whether to fetch.
+ * After the fetch (or skip) the exact alarm is re-armed so the
+ * self-rescheduling chain continues.
  */
 class WidgetRefreshWorker(
     private val context: Context,
@@ -31,28 +38,54 @@ class WidgetRefreshWorker(
         val prefs = AppPreferences(context)
 
         // ── Staleness check ───────────────────────────────────────────────────
-        val intervalMs  = prefs.refreshIntervalSeconds.toLong() * 1_000L
-        val lastMs      = prefs.lastSuccessfulRefreshMs
-        val elapsedMs   = System.currentTimeMillis() - lastMs
+        val intervalMs = prefs.refreshIntervalSeconds.toLong() * 1_000L
+        val lastMs     = prefs.lastSuccessfulRefreshMs
+        val elapsedMs  = System.currentTimeMillis() - lastMs
+
         if (lastMs > 0L && elapsedMs < intervalMs) {
             Log.d(TAG, "Skipping refresh — only ${elapsedMs / 1000}s since last update " +
                   "(interval ${prefs.refreshIntervalSeconds}s)")
-            // Re-arm exact alarm so the self-rescheduling chain continues
-        WidgetScheduler.scheduleExactAlarm(context)
-
-        return Result.success()
+            // Re-arm alarm so the self-rescheduling chain continues
+            WidgetScheduler.scheduleExactAlarm(context)
+            return Result.success()
         }
 
-        Log.d(TAG, "Refreshing widget (elapsed ${elapsedMs / 1000}s)")
+        Log.d(TAG, "Refreshing widget (elapsed ${elapsedMs / 1000}s / interval ${prefs.refreshIntervalSeconds}s)")
 
-        // ── Trigger widget update ─────────────────────────────────────────────
-        CallLogWidget.triggerRefresh(context)
+        // ── Direct fetch — no Broadcast intermediary ──────────────────────────
+        // Using sendBroadcast() here is unreliable: Doze can delay or drop the
+        // broadcast before the worker's process ends.  We fetch directly and
+        // trigger the widget update ourselves.
+        return try {
+            val repo   = CallRepository(prefs)
+            val result = repo.fetchCallLog(context)
 
-        // lastSuccessfulRefreshMs is set by CallLogWidget.fetchAndUpdate on
-        // successful fetch, so we don't update it here.
-        // Re-arm exact alarm so the self-rescheduling chain continues
-        WidgetScheduler.scheduleExactAlarm(context)
+            val manager = AppWidgetManager.getInstance(context)
+            val ids     = manager.getAppWidgetIds(
+                ComponentName(context, CallLogWidget::class.java))
 
-        return Result.success()
+            if (ids.isNotEmpty()) {
+                if (result.isSuccess) {
+                    prefs.lastSuccessfulRefreshMs = System.currentTimeMillis()
+                    Log.d(TAG, "Fetch succeeded — triggering widget update for ${ids.size} widget(s)")
+                } else {
+                    Log.w(TAG, "Fetch failed: ${result.exceptionOrNull()?.message} — using cached data")
+                }
+                // Delegate rendering to CallLogWidget via ACTION_REFRESH broadcast.
+                // At this point we are still in the worker's process which is kept
+                // alive by WorkManager — the broadcast will be dispatched immediately
+                // to our own process, not deferred.
+                CallLogWidget.triggerRefresh(context)
+            }
+
+            // Re-arm alarm so the self-rescheduling chain continues
+            WidgetScheduler.scheduleExactAlarm(context)
+            Result.success()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Worker error: ${e.message}", e)
+            WidgetScheduler.scheduleExactAlarm(context)
+            Result.retry()
+        }
     }
 }

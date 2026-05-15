@@ -1,5 +1,6 @@
 package com.tvcs.fritzboxcallwidget.widget
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,7 +10,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import androidx.core.content.ContextCompat
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -74,7 +74,23 @@ class WidgetForegroundService : Service() {
         fun start(context: Context) {
             val intent = Intent(context, WidgetForegroundService::class.java)
             // minSdk=26 → startForegroundService() ist immer verfügbar (API 26+).
-            context.startForegroundService(intent)
+            // Ab API 34 (UPSIDE_DOWN_CAKE) darf startForegroundService() NICHT aus
+            // dem Hintergrund aufgerufen werden — das wirft ForegroundServiceStart-
+            // NotAllowedException. Erlaubte Kontexte: BOOT_COMPLETED-Receiver,
+            // User-Interaktion (Activity), sichtbarer Prozess.
+            // Wir fangen die Exception ab damit der Alarm-/Worker-Pfad nicht crasht;
+            // der Service läuft via START_STICKY ohnehin weiter wenn er bereits aktiv ist.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                try {
+                    context.startForegroundService(intent)
+                } catch (e: ForegroundServiceStartNotAllowedException) {
+                    Log.w(TAG, "ForegroundService start blocked (background restriction API34+): ${e.message}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "ForegroundService start failed: ${e.message}")
+                }
+            } else {
+                context.startForegroundService(intent)
+            }
         }
 
         fun stop(context: Context) {

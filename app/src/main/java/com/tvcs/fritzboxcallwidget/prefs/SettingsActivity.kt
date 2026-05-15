@@ -9,14 +9,19 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import com.tvcs.fritzboxcallwidget.FritzCallApplication
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import com.google.android.material.appbar.MaterialToolbar
 import com.tvcs.fritzboxcallwidget.R
 import com.tvcs.fritzboxcallwidget.api.CallRepository
 import com.tvcs.fritzboxcallwidget.widget.CallLogWidget
@@ -32,10 +37,35 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        applyTheme(AppPreferences(this).theme)
+        // applyTheme() wird jetzt in FritzCallApplication.onCreate() aufgerufen
+        // bevor diese Activity startet — hier nicht mehr nötig.
+        // Ab SDK 35 ist Edge-to-Edge Pflicht.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
+
+        // MaterialToolbar als SupportActionBar registrieren, damit der
+        // Fragment-Container durch appbar_scrolling_view_behavior korrekt
+        // positioniert wird und nie hinter der Toolbar liegt.
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
         supportActionBar?.title = getString(R.string.settings_title)
+
+        // Navigationsleisten-Inset auf den settings_container übertragen,
+        // damit die letzten Einstellungen nicht hinter der Navigationsleiste
+        // enden (gilt vor allem für Gesture-Navigation ohne sichtbare Nav-Bar).
+        val container = findViewById<android.view.View>(R.id.settings_container)
+        ViewCompat.setOnApplyWindowInsetsListener(container) { view, insets ->
+            val navInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(
+                view.paddingLeft,
+                view.paddingTop,
+                view.paddingRight,
+                navInsets.bottom
+            )
+            insets
+        }
+
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.settings_container, SettingsFragment())
@@ -87,15 +117,21 @@ class SettingsActivity : AppCompatActivity() {
         // ── Permission banners ────────────────────────────────────────────────
 
         /**
-         * Shows / hides the three permission banners at the top of the Advanced
-         * category based on current system state.  Called on resume and after
-         * any permission result so the UI always reflects reality.
+         * Shows / hides the three permission banners at the bottom of the settings
+         * (in their own "Required permissions" category) based on current system state.
+         * The category header itself is hidden when no banner is needed so no empty
+         * section appears. Called on resume and after any permission result.
          */
         private fun refreshPermissionBanners() {
             val ctx = requireContext()
             showExactAlarmBanner(ctx)
             showBatteryOptimisationBanner(ctx)
             showNotificationPermissionBanner(ctx)
+            // Show the category header only when at least one banner is visible
+            val bannerKeys = listOf("pref_exact_alarm_hint", "pref_battery_hint", "pref_notif_perm_hint")
+            val anyVisible = bannerKeys.any { findPreference<Preference>(it)?.isVisible == true }
+            findPreference<androidx.preference.PreferenceCategory>("pref_category_permissions")
+                ?.isVisible = anyVisible
         }
 
         // ── Exact alarm ───────────────────────────────────────────────────────
@@ -230,7 +266,14 @@ class SettingsActivity : AppCompatActivity() {
 
             findPreference<ListPreference>(AppPreferences.KEY_THEME)
                 ?.setOnPreferenceChangeListener { _, v ->
-                    applyTheme(v as String); scheduleWidgetRefresh(); true
+                    applyTheme(v as String)
+                    scheduleWidgetRefresh()
+                    // recreate() ist nötig damit die Activity mit dem neuen
+                    // Night-Mode-Kontext neu inflated wird — ohne recreate()
+                    // bleiben alle @color/@drawable-Referenzen auf dem alten
+                    // Light/Dark-Stand bis zum nächsten Kaltstart.
+                    activity?.recreate()
+                    true
                 }
 
             AppPreferences.ALL_COLOR_KEYS.forEach { key ->
@@ -355,12 +398,13 @@ class SettingsActivity : AppCompatActivity() {
     // ── Companion ─────────────────────────────────────────────────────────────
 
     companion object {
+        /**
+         * Delegates to [FritzCallApplication.applyTheme] which calls
+         * AppCompatDelegate.setDefaultNightMode(). Kept here so existing
+         * call-sites in this file don't need to be changed.
+         */
         fun applyTheme(theme: String) {
-            AppCompatDelegate.setDefaultNightMode(when (theme) {
-                "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
-                "light" -> AppCompatDelegate.MODE_NIGHT_NO
-                else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-            })
+            FritzCallApplication.applyTheme(theme)
         }
 
         fun wrapLocale(context: Context, lang: String): Context {

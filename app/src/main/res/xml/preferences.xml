@@ -48,10 +48,10 @@
 
     <!-- Display -->
     <PreferenceCategory android:title="@string/pref_category_display" app:iconSpaceReserved="false">
-        <ListPreference android:key="pref_language"    android:title="@string/pref_language_title"    android:summary="%s" android:entries="@array/language_entries"    android:entryValues="@array/language_values"    android:defaultValue="system" app:iconSpaceReserved="false"/>
-        <ListPreference android:key="pref_theme"       android:title="@string/pref_theme_title"       android:summary="%s" android:entries="@array/theme_entries"       android:entryValues="@array/theme_values"       android:defaultValue="system" app:iconSpaceReserved="false"/>
-        <ListPreference android:key="pref_font_family" android:title="@string/pref_font_family_title" android:summary="%s" android:entries="@array/font_family_entries" android:entryValues="@array/font_family_values" android:defaultValue="default" app:iconSpaceReserved="false"/>
-        <ListPreference android:key="pref_font_size"   android:title="@string/pref_font_size_title"   android:summary="%s" android:entries="@array/font_size_entries"   android:entryValues="@array/font_size_values"   android:defaultValue="11"     app:iconSpaceReserved="false"/>
+        <ListPreference android:key="pref_language"    android:title="@string/pref_language_title"    app:useSimpleSummaryProvider="true" android:entries="@array/language_entries"    android:entryValues="@array/language_values"    android:defaultValue="system" app:iconSpaceReserved="false"/>
+        <ListPreference android:key="pref_theme"       android:title="@string/pref_theme_title"       app:useSimpleSummaryProvider="true" android:entries="@array/theme_entries"       android:entryValues="@array/theme_values"       android:defaultValue="system" app:iconSpaceReserved="false"/>
+        <ListPreference android:key="pref_font_family" android:title="@string/pref_font_family_title" app:useSimpleSummaryProvider="true" android:entries="@array/font_family_entries" android:entryValues="@array/font_family_values" android:defaultValue="default" app:iconSpaceReserved="false"/>
+        <ListPreference android:key="pref_font_size"   android:title="@string/pref_font_size_title"   app:useSimpleSummaryProvider="true" android:entries="@array/font_size_entries"   android:entryValues="@array/font_size_values"   android:defaultValue="11"     app:iconSpaceReserved="false"/>
     </PreferenceCategory>
 
     <!-- Light Mode Colors -->
@@ -88,30 +88,7 @@
     <!-- Advanced / optional features -->
     <PreferenceCategory android:title="@string/pref_category_advanced" app:iconSpaceReserved="false">
 
-        <!-- Permission / system setting banners (shown only when action needed) -->
-        <Preference
-            android:key="pref_exact_alarm_hint"
-            android:title="@string/pref_exact_alarm_title"
-            android:summary="@string/pref_exact_alarm_summary"
-            android:visible="false"
-            app:iconSpaceReserved="false"/>
-
-        <Preference
-            android:key="pref_battery_hint"
-            android:title="@string/pref_battery_hint_title"
-            android:summary="@string/pref_battery_hint_summary"
-            android:visible="false"
-            app:iconSpaceReserved="false"/>
-
-        <Preference
-            android:key="pref_notif_perm_hint"
-            android:title="@string/pref_notif_perm_title"
-            android:summary="@string/pref_notif_perm_summary"
-            android:visible="false"
-            app:iconSpaceReserved="false"/>
-
-        <!-- Show duration after name/number -->
-        <SwitchPreferenceCompat
+        <!-- Show duration after name/number -->        <SwitchPreferenceCompat
             android:key="pref_show_duration"
             android:title="@string/pref_show_duration_title"
             android:summary="@string/pref_show_duration_summary"
@@ -130,7 +107,7 @@
         <ListPreference
             android:key="pref_call_filter"
             android:title="@string/pref_call_filter_title"
-            android:summary="%s"
+            app:useSimpleSummaryProvider="true"
             android:entries="@array/call_filter_entries"
             android:entryValues="@array/call_filter_values"
             android:defaultValue="all"
@@ -175,6 +152,41 @@
     <!-- Reset -->
     <PreferenceCategory app:iconSpaceReserved="false">
         <Preference android:key="pref_reset_colors" android:title="@string/pref_reset_colors_title" android:summary="@string/pref_reset_colors_summary" app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
+
+    <!--
+         Permission / system setting banners.
+         Placed last so they never push real settings off-screen.
+         Each banner is hidden by default (android:visible="false") and
+         shown at runtime only when the corresponding permission is missing.
+    -->
+    <PreferenceCategory
+        android:title="@string/pref_category_permissions"
+        android:visible="false"
+        android:key="pref_category_permissions"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_exact_alarm_hint"
+            android:title="@string/pref_exact_alarm_title"
+            android:summary="@string/pref_exact_alarm_summary"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
+        <Preference
+            android:key="pref_battery_hint"
+            android:title="@string/pref_battery_hint_title"
+            android:summary="@string/pref_battery_hint_summary"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
+        <Preference
+            android:key="pref_notif_perm_hint"
+            android:title="@string/pref_notif_perm_title"
+            android:summary="@string/pref_notif_perm_summary"
+            android:visible="false"
+            app:iconSpaceReserved="false"/>
+
     </PreferenceCategory>
 
 </PreferenceScreen>

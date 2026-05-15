@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- API 31-32: requires user grant via system settings -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- API 33+: auto-granted, no user interaction needed -->
@@ -25,6 +25,7 @@
         android:icon="@mipmap/ic_fritzcalllog"
         android:roundIcon="@mipmap/ic_fritzcalllog_round"
         android:supportsRtl="true"
+        android:name="com.tvcs.fritzboxcallwidget.FritzCallApplication"
         android:theme="@style/Theme.FritzBoxCallWidget"
         android:usesCleartextTraffic="true">
 
@@ -101,12 +102,22 @@
         </receiver>
 
     
-        <!-- Foreground service: keeps process alive for reliable SCREEN_ON reception -->
+        <!-- Foreground service: keeps process alive for reliable SCREEN_ON reception.
+             foregroundServiceType="specialUse" is required from targetSdk=34 when
+             no other standard type fits. The use-case is: stay alive to receive
+             ACTION_SCREEN_ON (not on the static-receiver exemption list) so the
+             widget can refresh on screen-on without waiting for the next alarm.
+             The android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE property is mandatory
+             for Play Store submission when specialUse is declared. -->
         <service
             android:name="com.tvcs.fritzboxcallwidget.widget.WidgetForegroundService"
             android:exported="false"
             android:stopWithTask="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Listens for ACTION_SCREEN_ON to refresh the home-screen widget when the display turns on, ensuring up-to-date call-log data is visible without polling while the screen is off." />
+        </service>
 
         <!--
              Static receiver for power events.

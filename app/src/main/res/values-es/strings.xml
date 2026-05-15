@@ -112,6 +112,7 @@
     <string name="call_type_active_incoming">Llamada activa (entrante)</string>
     <string name="call_type_active_outgoing">Llamada activa (saliente)</string>
     <string name="pref_category_advanced">Funciones avanzadas</string>
+    <string name="pref_category_permissions">Permisos requeridos</string>
     <string name="pref_exact_alarm_title">⚠ Falta permiso de alarma exacta</string>
     <string name="pref_exact_alarm_summary">Toca para abrir la configuración del sistema. Sin este permiso, los intervalos de actualización pueden ser imprecisos.</string>
     <string name="pref_battery_hint_title">⚠ Optimización de batería activa</string>

@@ -112,6 +112,7 @@
     <string name="call_type_active_incoming">Appel actif (entrant)</string>
     <string name="call_type_active_outgoing">Appel actif (sortant)</string>
     <string name="pref_category_advanced">Fonctionnalités avancées</string>
+    <string name="pref_category_permissions">Autorisations requises</string>
     <string name="pref_exact_alarm_title">⚠ Permission d\'alarme exacte manquante</string>
     <string name="pref_exact_alarm_summary">Appuyer pour ouvrir les paramètres système. Sans cette permission, les intervalles de rafraîchissement peuvent être imprécis.</string>
     <string name="pref_battery_hint_title">⚠ Optimisation de la batterie active</string>

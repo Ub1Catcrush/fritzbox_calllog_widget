@@ -112,6 +112,7 @@
     <string name="call_type_active_incoming">Aktiver Anruf (eingehend)</string>
     <string name="call_type_active_outgoing">Aktiver Anruf (ausgehend)</string>
     <string name="pref_category_advanced">Erweiterte Funktionen</string>
+    <string name="pref_category_permissions">Erforderliche Berechtigungen</string>
     <string name="pref_exact_alarm_title">⚠ Berechtigung für genaue Alarme fehlt</string>
     <string name="pref_exact_alarm_summary">Tippen zum Öffnen der Systemeinstellungen. Ohne diese Berechtigung können Aktualisierungsintervalle ungenau sein.</string>
     <string name="pref_battery_hint_title">⚠ Akkuoptimierung aktiv</string>

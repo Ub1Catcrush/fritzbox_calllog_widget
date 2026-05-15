@@ -122,6 +122,7 @@
     <string name="call_type_active_incoming">Active call (incoming)</string>
     <string name="call_type_active_outgoing">Active call (outgoing)</string>
     <string name="pref_category_advanced">Advanced features</string>
+    <string name="pref_category_permissions">Required permissions</string>
     <string name="pref_exact_alarm_title">⚠ Exact alarm permission missing</string>
     <string name="pref_exact_alarm_summary">Tap to allow exact alarms in system settings. Without this, refresh intervals may be imprecise.</string>
     <string name="pref_battery_hint_title">⚠ Battery optimisation active</string>

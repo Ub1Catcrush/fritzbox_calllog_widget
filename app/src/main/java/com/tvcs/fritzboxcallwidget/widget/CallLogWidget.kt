@@ -63,7 +63,16 @@ class CallLogWidget : AppWidgetProvider() {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        // ForegroundService-Start hier ist sicher: onUpdate() wird vom System
+        // aus einem privilegierten Kontext aufgerufen (Widget-Update vom Launcher),
+        // der als Vordergrundkontext gilt. start() fängt ForegroundServiceStart-
+        // NotAllowedException intern ab falls es doch blockiert wird.
         WidgetForegroundService.start(context)
+        // Scheduler hier (neu-)starten: onEnabled() feuert nur beim allerersten
+        // Widget-Hinzufügen. Nach App-Updates, Neuinstallationen oder Geräteneustart
+        // (falls BootReceiver nicht greift) sorgt onUpdate() dafür dass die
+        // Alarm-Kette wieder anläuft.
+        WidgetScheduler.scheduleExactAlarm(context)
         for (id in ids) showLoading(context, manager, id)
         val pendingResult = goAsync()
         scope.launch {
@@ -231,6 +240,13 @@ class CallLogWidget : AppWidgetProvider() {
         views.setTextColor(R.id.tv_col_duration,    colors.colHeaderText)
         views.setViewVisibility(R.id.tv_col_duration,
             if (prefs.showDuration) View.VISIBLE else View.GONE)
+
+        // Header button icon tint — must be set programmatically because
+        // android:tint in XML is ignored by RemoteViews on API < 31, and
+        // ?attr/colorControlNormal cannot be resolved in widget context.
+        // setColorFilter(color, PorterDuff.Mode.SRC_IN) works on all APIs.
+        views.setInt(R.id.btn_refresh,  "setColorFilter", colors.headerText)
+        views.setInt(R.id.btn_settings, "setColorFilter", colors.headerText)
 
         // Column header text (use filter label when not "all")
         val filterLabel = filterLabel(ctx, prefs.callFilter)
