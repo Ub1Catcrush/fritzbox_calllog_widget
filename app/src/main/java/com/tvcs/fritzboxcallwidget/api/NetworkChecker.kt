@@ -3,7 +3,6 @@ package com.tvcs.fritzboxcallwidget.api
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import java.net.InetSocketAddress
@@ -62,34 +61,29 @@ object NetworkChecker {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         // ── 1. Check basic connectivity ───────────────────────────────────────
-        val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = cm.activeNetwork
-            val caps    = cm.getNetworkCapabilities(network)
-            caps != null &&
-                (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                 caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                 caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
-                 caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
-        } else {
-            @Suppress("DEPRECATION")
-            cm.activeNetworkInfo?.isConnected == true
-        }
+        // minSdk=26 → Build.VERSION_CODES.M (23) ist immer erfüllt;
+        // der deprecated activeNetworkInfo-Pfad (API<23) wird nie erreicht.
+        val network = cm.activeNetwork
+        val caps    = cm.getNetworkCapabilities(network)
+        val isConnected = caps != null &&
+            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+             caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
 
         if (!isConnected) return NetworkState.NoNetwork
 
         // ── 2. Check Battery Saver ────────────────────────────────────────────
+        // minSdk=26 → isPowerSaveMode (API 21/LOLLIPOP) ist immer verfügbar.
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val batterySaverOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            pm.isPowerSaveMode
-        } else false
+        val batterySaverOn = pm.isPowerSaveMode
 
         // ── 3. Check Data Saver (restrict background data) ────────────────────
         // RESTRICT_BACKGROUND_STATUS_ENABLED means background data is blocked
         // for apps not on the whitelist.
-        val dataSaverOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            cm.restrictBackgroundStatus ==
-                ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
-        } else false
+        // minSdk=26 → restrictBackgroundStatus (API 24/N) ist immer verfügbar.
+        val dataSaverOn = cm.restrictBackgroundStatus ==
+            ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
 
         return when {
             batterySaverOn && dataSaverOn ->

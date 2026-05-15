@@ -72,23 +72,34 @@ object WidgetScheduler {
         am.cancel(pi)
 
         when {
-            // API 33+: USE_EXACT_ALARM — no user permission needed
+            // API 33+ (TIRAMISU … BAKLAVA … 36+): USE_EXACT_ALARM wird automatisch
+            // gewährt für Kalender- und Alarm-Apps; alle anderen Apps bekommen es
+            // ebenfalls, sofern der Nutzer die App nicht manuell einschränkt.
+            // Ab API 36 kann Google Play den Zugriff auf USE_EXACT_ALARM für
+            // Apps einschränken, die keine Kalender-/Alarm-Funktion deklarieren.
+            // Wir prüfen deshalb ab API 33 auch hier canScheduleExactAlarms()
+            // und fallen sicher auf setAndAllowWhileIdle() zurück.
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
-                Log.d(TAG, "Exact alarm (API33+) in ${prefs.refreshIntervalSeconds}s")
+                if (am.canScheduleExactAlarms()) {
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
+                    Log.d(TAG, "Exact alarm (API33+) in ${prefs.refreshIntervalSeconds}s")
+                } else {
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
+                    Log.w(TAG, "Inexact alarm fallback (API33+) — USE_EXACT_ALARM nicht verfügbar")
+                }
             }
-            // API 31-32: SCHEDULE_EXACT_ALARM — check user grant
+            // API 31-32: SCHEDULE_EXACT_ALARM — erfordert explizite Nutzer-Freigabe
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                 if (am.canScheduleExactAlarms()) {
                     am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
                     Log.d(TAG, "Exact alarm (API31-32, granted) in ${prefs.refreshIntervalSeconds}s")
                 } else {
-                    // Fall back to inexact — user hasn't granted permission yet
+                    // Fallback auf inexact — Nutzer hat Permission noch nicht erteilt
                     am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
                     Log.w(TAG, "Inexact alarm fallback — SCHEDULE_EXACT_ALARM not granted")
                 }
             }
-            // API 26-30: setExactAndAllowWhileIdle always available
+            // API 26-30: setExactAndAllowWhileIdle immer verfügbar, keine Permission nötig
             else -> {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pi)
                 Log.d(TAG, "Exact alarm (API<31) in ${prefs.refreshIntervalSeconds}s")
@@ -115,8 +126,12 @@ object WidgetScheduler {
 
     fun canScheduleExactAlarms(context: Context): Boolean {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        // API 31+ (S): canScheduleExactAlarms() prüft sowohl SCHEDULE_EXACT_ALARM
+        // (API 31-32, muss vom Nutzer gewährt werden) als auch USE_EXACT_ALARM
+        // (API 33+, automatisch gewährt, aber ab API 36 von Google Play
+        // einschränkbar für Apps ohne Kalender-/Alarm-Deklaration).
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms()
-        else true
+        else true  // API 26-30: kein Alarm-Permission-System, immer true
     }
 
     fun requestExactAlarmPermissionIntent(context: Context): Intent? {

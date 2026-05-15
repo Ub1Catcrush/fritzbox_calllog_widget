@@ -66,17 +66,16 @@ class MissedCallWorker(
         }
 
         fun createNotificationChannel(context: Context) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(
-                    CHANNEL_ID,
-                    context.getString(R.string.notif_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply {
-                    description = context.getString(R.string.notif_channel_desc)
-                }
-                context.getSystemService(NotificationManager::class.java)
-                    ?.createNotificationChannel(channel)
+            // minSdk=26 (O) → NotificationChannel ist immer verfügbar.
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                context.getString(R.string.notif_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = context.getString(R.string.notif_channel_desc)
             }
+            context.getSystemService(NotificationManager::class.java)
+                ?.createNotificationChannel(channel)
         }
     }
 
@@ -129,8 +128,9 @@ class MissedCallWorker(
         createNotificationChannel(context)
 
         val nm = NotificationManagerCompat.from(context)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !nm.areNotificationsEnabled()) return
+        // POST_NOTIFICATIONS ist ab API 33 (TIRAMISU) eine Runtime-Permission;
+        // darunter ist sie implizit erteilt. areNotificationsEnabled() deckt beide Fälle ab.
+        if (!nm.areNotificationsEnabled()) return
 
         val ctx     = SettingsActivity.wrapLocale(context, prefs.language)
         val title   = ctx.resources.getQuantityString(
@@ -141,12 +141,16 @@ class MissedCallWorker(
             "$name  $time"
         }
 
+        // FLAG_IMMUTABLE ist ab API 31 (S) Pflicht für nicht-mutable PendingIntents.
+        // minSdk=26 → if/else nötig, damit der Build auf API 26–30 nicht scheitert.
+        val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        else PendingIntent.FLAG_UPDATE_CURRENT
+
         val openIntent = PendingIntent.getActivity(
             context, 0,
             Intent(context, SettingsActivity::class.java),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            else PendingIntent.FLAG_UPDATE_CURRENT
+            piFlags
         )
 
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)

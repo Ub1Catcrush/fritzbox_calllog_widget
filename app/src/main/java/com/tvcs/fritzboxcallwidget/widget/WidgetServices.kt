@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -72,11 +73,8 @@ class WidgetForegroundService : Service() {
 
         fun start(context: Context) {
             val intent = Intent(context, WidgetForegroundService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            // minSdk=26 → startForegroundService() ist immer verfügbar (API 26+).
+            context.startForegroundService(intent)
         }
 
         fun stop(context: Context) {
@@ -129,27 +127,29 @@ class WidgetForegroundService : Service() {
     // ── Notification ─────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.service_channel_name),
-                NotificationManager.IMPORTANCE_MIN   // silent, no heads-up, no sound
-            ).apply {
-                setShowBadge(false)
-                description = getString(R.string.service_channel_desc)
-            }
-            getSystemService(NotificationManager::class.java)
-                ?.createNotificationChannel(channel)
+        // minSdk=26 (O) → NotificationChannel ist immer verfügbar.
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.service_channel_name),
+            NotificationManager.IMPORTANCE_MIN   // silent, no heads-up, no sound
+        ).apply {
+            setShowBadge(false)
+            description = getString(R.string.service_channel_desc)
         }
+        getSystemService(NotificationManager::class.java)
+            ?.createNotificationChannel(channel)
     }
 
     private fun buildNotification(): Notification {
+        // FLAG_IMMUTABLE ist ab API 31 (S) für nicht-mutable PendingIntents Pflicht.
+        val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        else PendingIntent.FLAG_UPDATE_CURRENT
+
         val openSettings = PendingIntent.getActivity(
             this, 0,
             Intent(this, SettingsActivity::class.java),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            else PendingIntent.FLAG_UPDATE_CURRENT
+            piFlags
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_call_incoming)
@@ -170,7 +170,15 @@ class WidgetForegroundService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
         }
-        registerReceiver(screenOnReceiver, filter)
+        // API 34+ (UPSIDE_DOWN_CAKE): registerReceiver() erfordert ein explizites
+        // Export-Flag. Geschützte System-Broadcasts (SCREEN_ON, SCREEN_OFF,
+        // USER_PRESENT) müssen RECEIVER_NOT_EXPORTED verwenden, da nur das OS
+        // sie senden darf — keine Drittanbieter-App soll sie auslösen können.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            registerReceiver(screenOnReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(screenOnReceiver, filter)
+        }
     }
 
     private fun registerNetworkCallback() {

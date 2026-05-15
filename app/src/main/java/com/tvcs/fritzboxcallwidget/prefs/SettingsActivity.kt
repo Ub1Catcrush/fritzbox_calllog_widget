@@ -102,11 +102,11 @@ class SettingsActivity : AppCompatActivity() {
 
         private fun showExactAlarmBanner(ctx: Context) {
             val pref = findPreference<Preference>("pref_exact_alarm_hint") ?: return
-            // USE_EXACT_ALARM (API 33+) is auto-granted — never show the banner.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pref.isVisible = false
-                return
-            }
+            // Ab API 33 (TIRAMISU) wird USE_EXACT_ALARM normalerweise automatisch
+            // gewährt. Ab API 36 kann Google Play die Permission für Apps ohne
+            // Kalender-/Alarm-Funktion einschränken — daher auch hier prüfen.
+            // canScheduleExactAlarms() gibt false zurück wenn die Permission fehlt,
+            // unabhängig vom API-Level (API 31–36).
             val needed = !WidgetScheduler.canScheduleExactAlarms(ctx)
             pref.isVisible = needed
             if (needed) {
@@ -365,6 +365,9 @@ class SettingsActivity : AppCompatActivity() {
 
         fun wrapLocale(context: Context, lang: String): Context {
             if (lang == "system" || lang.isBlank()) return context
+            // Locale.of(String) ist ab API 35 (BAKLAVA / Android 15) verfügbar.
+            // Auf älteren Geräten (API 26–34) wird Locale.forLanguageTag() genutzt,
+            // das IETF-BCP-47-Tags (z. B. "de", "fr") korrekt verarbeitet.
             val locale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 Locale.of(lang)
             } else {

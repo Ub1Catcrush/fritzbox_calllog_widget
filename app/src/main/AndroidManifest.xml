@@ -112,15 +112,21 @@
              Static receiver for power events.
              ACTION_POWER_CONNECTED and ACTION_POWER_DISCONNECTED are on the
              Android 8+ implicit-broadcast exemption list and can be declared
-             statically.
+             statically. exported="true" is required because these broadcasts
+             are sent by the Android OS (not the app itself); exported="false"
+             would silently prevent delivery on SDK 34+ and is flagged as an
+             error when targetSdk=36.
+             NOTE: BatteryManager.ACTION_CHARGING uses the namespace
+             android.os.action (not android.intent.action).
         -->
         <receiver
             android:name="com.tvcs.fritzboxcallwidget.widget.PowerReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
                 <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
-                <action android:name="android.intent.action.CHARGING" />
+                <!-- BatteryManager.ACTION_CHARGING (API 23+, minSdk=26 ✓) -->
+                <action android:name="android.os.action.CHARGING" />
             </intent-filter>
         </receiver>
 
