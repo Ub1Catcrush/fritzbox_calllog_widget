@@ -149,4 +149,19 @@
         <item quantity="one">%d appel manqué</item>
         <item quantity="other">%d appels manqués</item>
     </plurals>
+
+    <!-- Update-Check -->
+    <string name="pref_category_about">À propos de l\'application</string>
+    <string name="update_check_title">Rechercher des mises à jour</string>
+    <string name="update_check_summary">Vérifier la version actuelle sur GitHub</string>
+    <string name="update_checking">Recherche de mises à jour…</string>
+    <string name="update_available">Version %1$s disponible – appuyez pour télécharger</string>
+    <string name="update_up_to_date">L\'application est à jour</string>
+    <string name="update_error">Échec de la vérification – appuyez à nouveau</string>
+    <string name="update_check_failed">Échec de la vérification : %1$s</string>
+    <string name="update_download_started">Téléchargement lancé…</string>
+    <string name="update_dialog_title">Mise à jour disponible</string>
+    <string name="update_dialog_message">La version v%1$s est disponible.\n\n%2$s</string>
+    <string name="update_dialog_install">Télécharger et installer</string>
+    <string name="update_dialog_later">Plus tard</string>
 </resources>

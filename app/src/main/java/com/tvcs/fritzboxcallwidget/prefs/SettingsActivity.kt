@@ -28,6 +28,8 @@ import com.tvcs.fritzboxcallwidget.widget.CallLogWidget
 import com.tvcs.fritzboxcallwidget.widget.WidgetScheduler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.tvcs.fritzboxcallwidget.api.UpdateManager
+import com.tvcs.fritzboxcallwidget.BuildConfig
 import java.util.Locale
 
 class SettingsActivity : AppCompatActivity() {
@@ -356,6 +358,67 @@ class SettingsActivity : AppCompatActivity() {
                     }
                     true
                 }
+
+            findPreference<Preference>("pref_check_update")
+                ?.setOnPreferenceClickListener { checkForUpdates(); true }
+        }
+
+
+        private fun checkForUpdates() {
+            val updatePref = findPreference<Preference>("pref_check_update") ?: return
+            updatePref.isEnabled = false
+            updatePref.summary   = getString(R.string.update_checking)
+
+            lifecycleScope.launch {
+                UpdateManager.checkForUpdates(requireContext())
+                    .onSuccess { info ->
+                        if (!isResumed) return@onSuccess
+                        if (info.hasUpdate && info.downloadUrl != null) {
+                            updatePref.summary   = getString(R.string.update_available, info.latestVersion)
+                            updatePref.isEnabled = true
+                            updatePref.setOnPreferenceClickListener {
+                                UpdateManager.downloadAndInstall(
+                                    requireContext(),
+                                    info.downloadUrl,
+                                    "fritzcalllog-${info.latestVersion}.apk"
+                                )
+                                Toast.makeText(
+                                    requireContext(),
+                                    getString(R.string.update_download_started),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                true
+                            }
+
+                            com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                                .setTitle(getString(R.string.update_dialog_title))
+                                .setMessage(getString(R.string.update_dialog_message,
+                                    info.latestVersion, info.releaseNotes ?: ""))
+                                .setPositiveButton(getString(R.string.update_dialog_install)) { _, _ ->
+                                    UpdateManager.downloadAndInstall(
+                                        requireContext(),
+                                        info.downloadUrl,
+                                        "fritzcalllog-${info.latestVersion}.apk"
+                                    )
+                                }
+                                .setNegativeButton(getString(R.string.update_dialog_later), null)
+                                .show()
+                        } else {
+                            updatePref.summary   = getString(R.string.update_up_to_date)
+                            updatePref.isEnabled = false
+                        }
+                    }
+                    .onFailure {
+                        if (!isResumed) return@onFailure
+                        updatePref.summary   = getString(R.string.update_error)
+                        updatePref.isEnabled = true
+                        Toast.makeText(
+                            requireContext(),
+                            getString(R.string.update_check_failed, it.message),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
         }
 
         // ── Notification permission request ───────────────────────────────────

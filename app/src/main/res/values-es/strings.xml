@@ -149,4 +149,19 @@
         <item quantity="one">%d llamada perdida</item>
         <item quantity="other">%d llamadas perdidas</item>
     </plurals>
+
+    <!-- Update-Check -->
+    <string name="pref_category_about">Acerca de la app</string>
+    <string name="update_check_title">Buscar actualizaciones</string>
+    <string name="update_check_summary">Comprobar la versión actual en GitHub</string>
+    <string name="update_checking">Buscando actualizaciones…</string>
+    <string name="update_available">Versión %1$s disponible – toca para descargar</string>
+    <string name="update_up_to_date">La app está actualizada</string>
+    <string name="update_error">Error al comprobar actualizaciones – toca de nuevo</string>
+    <string name="update_check_failed">Error al comprobar actualizaciones: %1$s</string>
+    <string name="update_download_started">Descarga iniciada…</string>
+    <string name="update_dialog_title">Actualización disponible</string>
+    <string name="update_dialog_message">La versión v%1$s está disponible.\n\n%2$s</string>
+    <string name="update_dialog_install">Descargar e instalar</string>
+    <string name="update_dialog_later">Más tarde</string>
 </resources>

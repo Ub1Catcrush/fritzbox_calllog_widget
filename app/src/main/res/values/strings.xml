@@ -159,4 +159,19 @@
         <item quantity="one">%d missed call</item>
         <item quantity="other">%d missed calls</item>
     </plurals>
+
+    <!-- Update-Check (Einstellungen) -->
+    <string name="pref_category_about">Über die App</string>
+    <string name="update_check_title">Nach Updates suchen</string>
+    <string name="update_check_summary">Aktuelle Version auf GitHub prüfen</string>
+    <string name="update_checking">Suche nach Updates…</string>
+    <string name="update_available">Version %1$s verfügbar – Tippen zum Laden</string>
+    <string name="update_up_to_date">App ist aktuell</string>
+    <string name="update_error">Update-Check fehlgeschlagen – erneut tippen</string>
+    <string name="update_check_failed">Update-Check fehlgeschlagen: %1$s</string>
+    <string name="update_download_started">Download gestartet…</string>
+    <string name="update_dialog_title">Update verfügbar</string>
+    <string name="update_dialog_message">Version v%1$s ist verfügbar.\n\n%2$s</string>
+    <string name="update_dialog_install">Laden &amp; Installieren</string>
+    <string name="update_dialog_later">Später</string>
 </resources>

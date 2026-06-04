@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Erlaubt den Zugriff auf heruntergeladene APK-Dateien für den Update-Installer -->
+    <external-files-path name="apk_downloads" path="Download/" />
+</paths>
