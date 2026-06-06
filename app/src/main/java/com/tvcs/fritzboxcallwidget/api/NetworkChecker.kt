@@ -39,7 +39,7 @@ object NetworkChecker {
     private const val TAG = "NetworkChecker"
 
     /** Timeout for the TCP reachability probe in milliseconds. */
-    private const val TCP_PROBE_TIMEOUT_MS = 1_000
+    private const val TCP_PROBE_TIMEOUT_MS = 500
 
     sealed class NetworkState {
         /** Network is available and not known to be restricted. */

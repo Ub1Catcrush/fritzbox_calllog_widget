@@ -39,8 +39,8 @@ class CallRepository(private val prefs: AppPreferences) {
     companion object {
         private const val TAG           = "CallRepository"
         private val FRITZ_DATE_FORMAT   = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
-        private const val MAX_RETRIES   = 3
-        private const val RETRY_BASE_MS = 2_000L
+        private const val MAX_RETRIES   = 2
+        private const val RETRY_BASE_MS = 500L
 
         private val cachedEntriesRef = AtomicReference<List<CallEntry>?>(null)
     }
@@ -181,6 +181,9 @@ class CallRepository(private val prefs: AppPreferences) {
                     }
                 }.sortedByDescending { it.date }
                 return Result.success(entries)
+            } catch (e: java.net.ConnectException) {
+                // Host not reachable at TCP level — retrying won't help
+                return Result.failure(e)
             } catch (e: Exception) {
                 lastError = e
                 val isLast = attempt == MAX_RETRIES - 1
