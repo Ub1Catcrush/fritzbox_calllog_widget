@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
@@ -107,6 +108,8 @@ object WidgetScheduler {
         }
     }
 
+    private const val UNIQUE_WORK_NAME = "widget_refresh_if_stale"
+
     /**
      * Enqueue a one-shot WorkManager job that performs a staleness check and
      * refreshes the widget if the interval has elapsed. No network constraint
@@ -116,10 +119,17 @@ object WidgetScheduler {
         val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
             .addTag(TAG)
             .build()
-        WorkManager.getInstance(context).enqueue(request)
+        // KEEP means: if a refresh is already queued or running, this new
+        // request is dropped rather than stacked. This matters most when the
+        // network connectivity callback fires repeatedly in a short window
+        // (e.g. VPN flapping connect/disconnect/connect) — without dedupe,
+        // each event would queue another full fetch, hammering the FritzBox
+        // with parallel requests and making recovery slower, not faster.
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
         // Re-arm the alarm so the chain continues from now
         scheduleExactAlarm(context)
-        Log.d(TAG, "refreshIfStale enqueued")
+        Log.d(TAG, "refreshIfStale enqueued (unique, KEEP)")
     }
 
     // ── Permission helpers ────────────────────────────────────────────────────

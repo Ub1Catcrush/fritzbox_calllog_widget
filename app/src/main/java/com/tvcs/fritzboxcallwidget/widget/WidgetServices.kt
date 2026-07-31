@@ -207,6 +207,19 @@ class WidgetForegroundService : Service() {
                 Log.d(TAG, "Network available — refresh if stale")
                 WidgetScheduler.refreshIfStale(this@WidgetForegroundService)
             }
+
+            override fun onLost(network: Network) {
+                // Losing a network (e.g. VPN disconnecting) doesn't necessarily
+                // trigger onAvailable again — the underlying WiFi/mobile network
+                // was already "available" before the VPN came up, so no *new*
+                // network object appears when the VPN drops. Without this
+                // callback the widget would stay stuck showing the last
+                // connection error until the next scheduled alarm (default
+                // every few minutes). Re-checking here means the app retries a
+                // configured LAN/fallback profile right away.
+                Log.d(TAG, "Network lost — refresh if stale (e.g. VPN disconnected)")
+                WidgetScheduler.refreshIfStale(this@WidgetForegroundService)
+            }
         }
         cm.registerNetworkCallback(request, cb)
         networkCallback = cb

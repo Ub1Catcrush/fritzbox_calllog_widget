@@ -163,16 +163,27 @@ class FritzBoxClient(
             computeMd5Response(challenge)
 
         // --- BLOCKTIME LOGIK ---
+        // The FRITZ!Box's brute-force protection can demand a wait of anywhere
+        // from a few seconds to several minutes before it will accept another
+        // login attempt. Blocking the calling thread here (Thread.sleep) would
+        // stall the whole widget refresh — and since this method isn't a
+        // suspend fun, that block isn't even cancellable, so it would ride out
+        // the full delay regardless of any timeout set by the caller. Instead,
+        // fail immediately with the wait time in the message; the normal
+        // retry/backoff logic in CallRepository (and the next scheduled
+        // refresh) will pick it up again later without ever freezing the UI.
         val blockTime =
             challengeXml.substringAfter("<BlockTime>").substringBefore("</BlockTime>").trim()
                 .toIntOrNull() ?: 0
         if (blockTime > 0) {
-            // Countdown-Schleife von blockTime bis 1
             Log.w(
                 TAG,
                 "FritzBox fordert eine Wartezeit von $blockTime Sekunden (Brute-Force-Schutz)"
             )
-            Thread.sleep(blockTime * 1000L)
+            throw FritzBoxException(
+                "FritzBox sperrt Anmeldeversuche für $blockTime Sekunden " +
+                "(Brute-Force-Schutz) — später erneut versuchen"
+            )
         }
         // -----------------------
 

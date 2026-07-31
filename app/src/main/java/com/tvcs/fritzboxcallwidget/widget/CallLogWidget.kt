@@ -3,12 +3,14 @@ package com.tvcs.fritzboxcallwidget.widget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
@@ -26,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicBoolean
 
 class CallLogWidget : AppWidgetProvider() {
 
@@ -42,6 +45,23 @@ class CallLogWidget : AppWidgetProvider() {
         // goAsync() below keeps the BroadcastReceiver process alive while the
         // coroutine is running, preventing the OS from killing the job mid-fetch.
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        // Guards against overlapping fetches: a manual refresh tap, the
+        // exact-alarm tick, and the network-connectivity callback can all
+        // fire within moments of each other (e.g. during a flappy VPN
+        // transition). Without this, each would kick off its own concurrent
+        // fetchAndUpdateSuspend() call, all hitting the FritzBox in parallel
+        // and repeatedly overwriting the widget's RemoteViews mid-render —
+        // which is exactly what produces the perceived "hang". Only one
+        // fetch runs at a time; the rest are simply skipped (loading state
+        // stays visible; the in-flight fetch will refresh it shortly).
+        private val fetchInProgress = AtomicBoolean(false)
+
+        private const val TAG = "CallLogWidget"
+
+        /** See fetchAndUpdateSuspend(): skip re-fetching if a successful fetch
+         *  landed within this many ms of the current ACTION_REFRESH trigger. */
+        private const val RECENT_REFRESH_GRACE_MS = 8_000L
 
         fun triggerRefresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -74,11 +94,7 @@ class CallLogWidget : AppWidgetProvider() {
         // Alarm-Kette wieder anläuft.
         WidgetScheduler.scheduleExactAlarm(context)
         for (id in ids) showLoading(context, manager, id)
-        val pendingResult = goAsync()
-        scope.launch {
-            try { fetchAndUpdateSuspend(context, manager, ids) }
-            finally { pendingResult.finish() }
-        }
+        launchFetch(context, manager, ids, goAsync())
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -91,11 +107,7 @@ class CallLogWidget : AppWidgetProvider() {
             updateWidget(context, manager, id,
                 State.Success(filtered.take(prefs.maxEntries)), prefs)
         } else {
-            val pendingResult = goAsync()
-            scope.launch {
-                try { fetchAndUpdateSuspend(context, manager, intArrayOf(id)) }
-                finally { pendingResult.finish() }
-            }
+            launchFetch(context, manager, intArrayOf(id), goAsync())
         }
     }
 
@@ -110,14 +122,7 @@ class CallLogWidget : AppWidgetProvider() {
                 // goAsync() tells Android to keep this process alive until
                 // pendingResult.finish() is called — without it the OS may
                 // kill the process before the coroutine fetch completes.
-                val pendingResult = goAsync()
-                scope.launch {
-                    try {
-                        fetchAndUpdateSuspend(context, manager, ids)
-                    } finally {
-                        pendingResult.finish()
-                    }
-                }
+                launchFetch(context, manager, ids, goAsync())
             }
             ACTION_NEXT_FILTER -> {
                 // Cycle to next filter value and refresh display from cache
@@ -133,11 +138,7 @@ class CallLogWidget : AppWidgetProvider() {
                         updateWidget(context, manager, id,
                             State.Success(filtered.take(prefs.maxEntries)), prefs)
                 } else {
-                    val pr2 = goAsync()
-                    scope.launch {
-                        try { fetchAndUpdateSuspend(context, manager, ids) }
-                        finally { pr2.finish() }
-                    }
+                    launchFetch(context, manager, ids, goAsync())
                 }
             }
         }
@@ -172,6 +173,35 @@ class CallLogWidget : AppWidgetProvider() {
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Launches [fetchAndUpdateSuspend] guarded by [fetchInProgress] so that
+     * overlapping triggers (manual refresh tap, alarm tick, network-callback
+     * refresh, filter-cycle fallback) can never run concurrently. If a fetch
+     * is already in flight, this trigger is simply dropped — [pendingResult]
+     * is finished immediately so goAsync() doesn't keep the process pinned
+     * for no reason, and the in-flight fetch's own update will land shortly.
+     */
+    private fun launchFetch(
+        context: Context,
+        manager: AppWidgetManager,
+        ids: IntArray,
+        pendingResult: BroadcastReceiver.PendingResult
+    ) {
+        if (!fetchInProgress.compareAndSet(false, true)) {
+            Log.d(TAG, "Fetch already in progress — skipping duplicate trigger")
+            pendingResult.finish()
+            return
+        }
+        scope.launch {
+            try {
+                fetchAndUpdateSuspend(context, manager, ids)
+            } finally {
+                fetchInProgress.set(false)
+                pendingResult.finish()
+            }
+        }
+    }
+
     private suspend fun fetchAndUpdateSuspend(context: Context, manager: AppWidgetManager, ids: IntArray) {
         run {
             val prefs = AppPreferences(context)
@@ -183,6 +213,23 @@ class CallLogWidget : AppWidgetProvider() {
                 val filtered = applyFilter(cached, prefs)
                 val s = State.Success(filtered.take(prefs.maxEntries))
                 for (id in ids) updateWidget(context, manager, id, s, prefs)
+            }
+
+            // WidgetRefreshWorker performs its own full fetchCallLog() on the
+            // scheduled alarm tick and then triggers this exact ACTION_REFRESH
+            // path purely to (re-)render — it does not pass its result along.
+            // Without this check, every scheduled tick would hit the FritzBox
+            // twice in a row (once in the worker, once here), needlessly
+            // doubling network load and the worst-case time before the widget
+            // settles. If a successful fetch just landed, the cache rendered
+            // above is already current, so skip the second round-trip.
+            val justRefreshed = cached != null &&
+                (System.currentTimeMillis() - prefs.lastSuccessfulRefreshMs) < RECENT_REFRESH_GRACE_MS
+            if (justRefreshed) {
+                Log.d(TAG, "Skipping redundant fetch — cache is ${
+                    (System.currentTimeMillis() - prefs.lastSuccessfulRefreshMs) / 1000
+                }s old")
+                return
             }
 
             val result = repo.fetchCallLog(context)

@@ -6,8 +6,10 @@ import com.tvcs.fritzboxcallwidget.model.CallEntry
 import com.tvcs.fritzboxcallwidget.model.CallType
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
@@ -41,6 +43,28 @@ class CallRepository(private val prefs: AppPreferences) {
         private val FRITZ_DATE_FORMAT   = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
         private const val MAX_RETRIES   = 2
         private const val RETRY_BASE_MS = 500L
+
+        /**
+         * Hard ceiling for a single connection attempt (one profile, one retry
+         * attempt). Bounds the worst case where a TCP connection is accepted
+         * (so the pre-flight [NetworkChecker.isHostReachable] probe passes) but
+         * then stalls mid-request — e.g. VPN drops or mobile data is interrupted
+         * right after the socket opens. Without this, OkHttp's own timeouts
+         * (connect+read+write, possibly doubled by a 401→digest retry) could
+         * take the better part of a minute per attempt.
+         */
+        private const val PER_ATTEMPT_TIMEOUT_MS = 15_000L
+
+        /**
+         * Hard ceiling for the *entire* fetchCallLog() call across all
+         * configured profiles and all their retries combined. This is the
+         * safety net that guarantees the widget never appears to hang: no
+         * matter how many profiles are configured, a refresh always resolves
+         * (success, cached fallback, or error) within this window, which is
+         * safely inside the time Android's goAsync()/WorkManager execution
+         * window allows before the process can be reclaimed.
+         */
+        private const val TOTAL_FETCH_TIMEOUT_MS = 40_000L
 
         private val cachedEntriesRef = AtomicReference<List<CallEntry>?>(null)
     }
@@ -92,63 +116,90 @@ class CallRepository(private val prefs: AppPreferences) {
         }
 
         var lastError: Throwable? = null
+        var timedOut = false
 
-        for (profile in profiles) {
-            if (profile.host.isBlank()) {
+        // ── Overall hard timeout ───────────────────────────────────────────────
+        // Everything below (TCP probes, HTTP fetches, retries, across *all*
+        // configured profiles) is bounded by TOTAL_FETCH_TIMEOUT_MS. If it's
+        // exceeded we fall through exactly like "all profiles failed" below —
+        // the widget shows cached data with an error overlay (or a plain error
+        // if there's no cache yet) instead of hanging indefinitely. This is
+        // what guarantees the widget can never appear frozen: a refresh always
+        // finishes, one way or another, within a bounded time.
+        val earlySuccess: Result<List<CallEntry>>? = try {
+            withTimeout(TOTAL_FETCH_TIMEOUT_MS) {
+            for (profile in profiles) {
+                if (profile.host.isBlank()) {
+                    onProgress(Progress(
+                        "${profile.displayName}: Adresse nicht konfiguriert — übersprungen",
+                        isError = true
+                    ))
+                    continue
+                }
+
+                // ── TCP reachability probe ─────────────────────────────────────────
+                // Before making any HTTP request, verify that the host is actually
+                // reachable at TCP level.  This catches the common case where Android
+                // reports "Connected" (e.g. VPN active, or WiFi without LAN access)
+                // but the FritzBox is not reachable on the current network — which
+                // would otherwise cause the widget to hang for up to connectTimeout
+                // seconds and trigger an Android ANR dialog.
+                val reachable = NetworkChecker.isHostReachable(profile.host, profile.port)
+                if (!reachable) {
+                    val msg = "${profile.displayName}: Host ${profile.host}:${profile.port} " +
+                              "nicht erreichbar (VPN oder kein LAN-Zugang?) — übersprungen"
+                    onProgress(Progress(msg, isError = true))
+                    Log.w(TAG, msg)
+                    lastError = Exception(msg)
+                    continue
+                }
+
+                onProgress(Progress("Verbinde mit ${profile.displayName} (${profile.host})…"))
+
+                val result = fetchWithRetry(profile, onProgress)
+                if (result.isSuccess) {
+                    val entries = result.getOrThrow()
+                    // Optionally enrich unknown entries with FritzBox phonebook names
+                    val enriched = if (prefs.phonebookLookupEnabled) {
+                        entries.map { e ->
+                            if (e.name == null) {
+                                val name = PhonebookRepository.lookupName(e.number, prefs)
+                                if (name != null) e.copy(name = name) else e
+                            } else e
+                        }
+                    } else entries
+
+                    // Apply call type filter
+                    val filtered = prefs.activeCallTypeFilter()
+                        ?.let { allowed -> enriched.filter { it.type in allowed } }
+                        ?: enriched
+
+                    cachedEntriesRef.set(enriched)  // cache unfiltered for widget resize
+                    onProgress(Progress("${filtered.size} Anrufe geladen von ${profile.displayName}"))
+                    return@withTimeout Result.success(filtered)
+                }
+
+                lastError = result.exceptionOrNull()
                 onProgress(Progress(
-                    "${profile.displayName}: Adresse nicht konfiguriert — übersprungen",
+                    "${profile.displayName} fehlgeschlagen: ${lastError?.message}",
                     isError = true
                 ))
-                continue
             }
-
-            // ── TCP reachability probe ─────────────────────────────────────────
-            // Before making any HTTP request, verify that the host is actually
-            // reachable at TCP level.  This catches the common case where Android
-            // reports "Connected" (e.g. VPN active, or WiFi without LAN access)
-            // but the FritzBox is not reachable on the current network — which
-            // would otherwise cause the widget to hang for up to connectTimeout
-            // seconds and trigger an Android ANR dialog.
-            val reachable = NetworkChecker.isHostReachable(profile.host, profile.port)
-            if (!reachable) {
-                val msg = "${profile.displayName}: Host ${profile.host}:${profile.port} " +
-                          "nicht erreichbar (VPN oder kein LAN-Zugang?) — übersprungen"
-                onProgress(Progress(msg, isError = true))
-                Log.w(TAG, msg)
-                lastError = Exception(msg)
-                continue
+            null
             }
+        } catch (e: TimeoutCancellationException) {
+            timedOut = true
+            null
+        }
 
-            onProgress(Progress("Verbinde mit ${profile.displayName} (${profile.host})…"))
+        if (earlySuccess != null) return@withContext earlySuccess
 
-            val result = fetchWithRetry(profile, onProgress)
-            if (result.isSuccess) {
-                val entries = result.getOrThrow()
-                // Optionally enrich unknown entries with FritzBox phonebook names
-                val enriched = if (prefs.phonebookLookupEnabled) {
-                    entries.map { e ->
-                        if (e.name == null) {
-                            val name = PhonebookRepository.lookupName(e.number, prefs)
-                            if (name != null) e.copy(name = name) else e
-                        } else e
-                    }
-                } else entries
-
-                // Apply call type filter
-                val filtered = prefs.activeCallTypeFilter()
-                    ?.let { allowed -> enriched.filter { it.type in allowed } }
-                    ?: enriched
-
-                cachedEntriesRef.set(enriched)  // cache unfiltered for widget resize
-                onProgress(Progress("${filtered.size} Anrufe geladen von ${profile.displayName}"))
-                return@withContext Result.success(filtered)
-            }
-
-            lastError = result.exceptionOrNull()
-            onProgress(Progress(
-                "${profile.displayName} fehlgeschlagen: ${lastError?.message}",
-                isError = true
-            ))
+        if (timedOut) {
+            val msg = "Zeitüberschreitung — Verbindungsversuch dauerte zu lange " +
+                       "(VPN- oder Mobilfunkwechsel?)"
+            onProgress(Progress(msg, isError = true))
+            Log.w(TAG, "fetchCallLog exceeded ${TOTAL_FETCH_TIMEOUT_MS}ms budget")
+            lastError = Exception(msg)
         }
 
         val cached = cachedEntriesRef.get()
@@ -172,7 +223,11 @@ class CallRepository(private val prefs: AppPreferences) {
         repeat(MAX_RETRIES) { attempt ->
             try {
                 val client = FritzBoxClient(profile, prefs.fritzUsername, prefs.fritzPassword)
-                val rawEntries = client.getCallList()
+                // Bound this single attempt so a connection that stalls mid-request
+                // (e.g. VPN drops right after the TCP probe succeeded) fails fast
+                // and moves on to the next retry/profile instead of riding out
+                // OkHttp's full connect+read+write timeout budget.
+                val rawEntries = withTimeout(PER_ATTEMPT_TIMEOUT_MS) { client.getCallList() }
                 val entries = rawEntries.mapNotNull { raw ->
                     try { mapEntry(raw, prefs.phonePrefix, prefs.localAreaCode) }
                     catch (e: Exception) {
@@ -184,6 +239,28 @@ class CallRepository(private val prefs: AppPreferences) {
             } catch (e: java.net.ConnectException) {
                 // Host not reachable at TCP level — retrying won't help
                 return Result.failure(e)
+            } catch (e: TimeoutCancellationException) {
+                // Treat as a normal retryable failure — do NOT let this escape
+                // as an uncaught cancellation, and do NOT rethrow, since it's
+                // scoped to this attempt's own withTimeout, not the caller's
+                // coroutine scope being cancelled.
+                lastError = java.io.IOException(
+                    "Zeitüberschreitung nach ${PER_ATTEMPT_TIMEOUT_MS / 1000}s " +
+                    "bei ${profile.host} (Verbindung abgebrochen?)", e
+                )
+                val isLast = attempt == MAX_RETRIES - 1
+                if (!isLast) {
+                    val delayMs = RETRY_BASE_MS * (1L shl attempt)
+                    Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES on ${profile.host} timed out")
+                    onProgress(Progress(
+                        "${profile.displayName}: Versuch ${attempt + 1}/$MAX_RETRIES — " +
+                        "Zeitüberschreitung, neuer Versuch in ${delayMs / 1000}s…",
+                        isError = true
+                    ))
+                    delay(delayMs)
+                } else {
+                    Log.e(TAG, "All $MAX_RETRIES attempts timed out on ${profile.host}")
+                }
             } catch (e: Exception) {
                 lastError = e
                 val isLast = attempt == MAX_RETRIES - 1
