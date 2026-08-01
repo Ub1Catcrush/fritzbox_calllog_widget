@@ -38,8 +38,10 @@ object NetworkChecker {
 
     private const val TAG = "NetworkChecker"
 
-    /** Timeout for the TCP reachability probe in milliseconds. */
-    private const val TCP_PROBE_TIMEOUT_MS = 500
+    /** Timeout for the TCP reachability probe in milliseconds. Covers both
+     *  DNS resolution and the TCP connect, since [isHostReachable] now
+     *  bounds the whole thing as a unit. */
+    private const val TCP_PROBE_TIMEOUT_MS = 1500
 
     sealed class NetworkState {
         /** Network is available and not known to be restricted. */
@@ -100,8 +102,15 @@ object NetworkChecker {
     /**
      * Performs a fast TCP-level reachability probe against [host]:[port].
      *
-     * This is intentionally a **blocking** call — always invoke it from a
-     * background thread or inside `withContext(Dispatchers.IO)`.
+     * Safe to call from any coroutine — internally bounded via
+     * [BlockingIoTimeout] so that even a hung DNS lookup (the common case
+     * on a WiFi network with no real internet access, e.g. a captive
+     * portal) cannot block the caller past [timeoutMs]. This is critical:
+     * `InetSocketAddress(host, port)` resolves DNS *synchronously* and is
+     * NOT bounded by the timeout passed to `Socket.connect()` — a naive
+     * implementation can hang for tens of seconds on a bad network, which
+     * is long enough to trigger an Android ANR dialog for any caller using
+     * `goAsync()` (e.g. the widget's BroadcastReceiver).
      *
      * Why TCP and not ICMP ping?
      *   - Android requires ROOT or a special manifest permission for raw
@@ -113,7 +122,7 @@ object NetworkChecker {
      *   - VPN is active and routes traffic away from the local LAN
      *     (FritzBox at 192.168.x.x is no longer reachable)
      *   - Connected to a public / guest WiFi that has no route to the
-     *     FritzBox
+     *     FritzBox, or has no working DNS at all
      *   - The FritzBox itself is offline or on a different subnet
      *
      * @param host  Hostname or IP address of the FritzBox.
@@ -121,20 +130,25 @@ object NetworkChecker {
      * @param timeoutMs  Maximum wait in milliseconds (default [TCP_PROBE_TIMEOUT_MS]).
      * @return `true` if a TCP connection could be established, `false` otherwise.
      */
-    fun isHostReachable(
+    suspend fun isHostReachable(
         host: String,
         port: Int,
         timeoutMs: Int = TCP_PROBE_TIMEOUT_MS
     ): Boolean {
-        return try {
-            Socket().use { socket ->
-                socket.connect(InetSocketAddress(host, port), timeoutMs)
+        val result = BlockingIoTimeout.runBounded(timeoutMs.toLong(), "isHostReachable($host:$port)") {
+            try {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(host, port), timeoutMs)
+                }
                 true
+            } catch (e: Exception) {
+                Log.d(TAG, "Host unreachable — $host:$port (${e.javaClass.simpleName}: ${e.message})")
+                false
             }
-        } catch (e: Exception) {
-            Log.d(TAG, "Host unreachable — $host:$port (${e.javaClass.simpleName}: ${e.message})")
-            false
         }
+        // null means BlockingIoTimeout gave up waiting (e.g. DNS resolution
+        // stalled past timeoutMs) — treat exactly like "unreachable".
+        return result ?: false
     }
 
     /**

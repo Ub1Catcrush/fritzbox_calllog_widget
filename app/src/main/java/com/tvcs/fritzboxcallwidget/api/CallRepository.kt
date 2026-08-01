@@ -224,10 +224,25 @@ class CallRepository(private val prefs: AppPreferences) {
             try {
                 val client = FritzBoxClient(profile, prefs.fritzUsername, prefs.fritzPassword)
                 // Bound this single attempt so a connection that stalls mid-request
-                // (e.g. VPN drops right after the TCP probe succeeded) fails fast
-                // and moves on to the next retry/profile instead of riding out
-                // OkHttp's full connect+read+write timeout budget.
-                val rawEntries = withTimeout(PER_ATTEMPT_TIMEOUT_MS) { client.getCallList() }
+                // (e.g. VPN drops right after the TCP probe succeeded, or DNS
+                // resolution inside OkHttp hangs on a network with no working
+                // DNS) fails fast and moves on to the next retry/profile.
+                //
+                // Plain `withTimeout { client.getCallList() }` is NOT reliable
+                // here: getCallList() runs synchronous, non-suspending blocking
+                // I/O under the hood (OkHttp's Call.execute(), raw DNS lookups),
+                // and cancelling a coroutine that's synchronously executing
+                // non-cooperative blocking code does not reliably unblock the
+                // caller. BlockingIoTimeout runs the call on its own coroutine
+                // and only ever awaits it under a timeout, which *does* reliably
+                // return control — this is what actually prevents the Android
+                // ANR dialog ("App reagiert nicht") on bad networks.
+                val rawEntries = BlockingIoTimeout.runBounded(
+                    PER_ATTEMPT_TIMEOUT_MS, "getCallList(${profile.host})"
+                ) { client.getCallList() } ?: throw java.io.IOException(
+                    "Zeitüberschreitung nach ${PER_ATTEMPT_TIMEOUT_MS / 1000}s " +
+                    "bei ${profile.host} (Verbindung abgebrochen oder DNS hängt?)"
+                )
                 val entries = rawEntries.mapNotNull { raw ->
                     try { mapEntry(raw, prefs.phonePrefix, prefs.localAreaCode) }
                     catch (e: Exception) {
@@ -239,28 +254,6 @@ class CallRepository(private val prefs: AppPreferences) {
             } catch (e: java.net.ConnectException) {
                 // Host not reachable at TCP level — retrying won't help
                 return Result.failure(e)
-            } catch (e: TimeoutCancellationException) {
-                // Treat as a normal retryable failure — do NOT let this escape
-                // as an uncaught cancellation, and do NOT rethrow, since it's
-                // scoped to this attempt's own withTimeout, not the caller's
-                // coroutine scope being cancelled.
-                lastError = java.io.IOException(
-                    "Zeitüberschreitung nach ${PER_ATTEMPT_TIMEOUT_MS / 1000}s " +
-                    "bei ${profile.host} (Verbindung abgebrochen?)", e
-                )
-                val isLast = attempt == MAX_RETRIES - 1
-                if (!isLast) {
-                    val delayMs = RETRY_BASE_MS * (1L shl attempt)
-                    Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES on ${profile.host} timed out")
-                    onProgress(Progress(
-                        "${profile.displayName}: Versuch ${attempt + 1}/$MAX_RETRIES — " +
-                        "Zeitüberschreitung, neuer Versuch in ${delayMs / 1000}s…",
-                        isError = true
-                    ))
-                    delay(delayMs)
-                } else {
-                    Log.e(TAG, "All $MAX_RETRIES attempts timed out on ${profile.host}")
-                }
             } catch (e: Exception) {
                 lastError = e
                 val isLast = attempt == MAX_RETRIES - 1

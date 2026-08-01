@@ -3,7 +3,6 @@ package com.tvcs.fritzboxcallwidget.api
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -127,8 +126,13 @@ object ConnectivityChecker {
         val labelDns = "DNS / Hostname"
         running(labelDns)
 
-        // Use withTimeoutOrNull + coroutine-safe dispatch — avoids blocking Thread.join()
-        val resolved: InetAddress? = withTimeoutOrNull(DNS_TIMEOUT_MS) {
+        // Plain withTimeoutOrNull around a raw blocking InetAddress.getByName()
+        // call is not reliable — it has no suspension point of its own, so a
+        // stuck DNS lookup can still block this coroutine for its full
+        // duration regardless of DNS_TIMEOUT_MS. BlockingIoTimeout runs it on
+        // a separate coroutine and only ever awaits it under a timeout, which
+        // does reliably return control (see BlockingIoTimeout's doc comment).
+        val resolved: InetAddress? = BlockingIoTimeout.runBounded(DNS_TIMEOUT_MS, "DNS(${profile.host})") {
             runCatching { InetAddress.getByName(profile.host) }.getOrNull()
         }
 
