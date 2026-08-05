@@ -237,7 +237,7 @@ class WidgetForegroundService : Service() {
 class WidgetUpdateService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        CallLogWidget.triggerRefresh(this)
+        WidgetScheduler.forceRefreshNow(this)
         stopSelf(startId)
         return START_NOT_STICKY
     }

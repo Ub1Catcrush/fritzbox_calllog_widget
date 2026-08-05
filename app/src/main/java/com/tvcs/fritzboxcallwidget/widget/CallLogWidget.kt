@@ -3,7 +3,6 @@ package com.tvcs.fritzboxcallwidget.widget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -21,14 +20,8 @@ import com.tvcs.fritzboxcallwidget.model.CallEntry
 import com.tvcs.fritzboxcallwidget.model.CallType
 import com.tvcs.fritzboxcallwidget.prefs.AppPreferences
 import com.tvcs.fritzboxcallwidget.prefs.SettingsActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.atomic.AtomicBoolean
 
 class CallLogWidget : AppWidgetProvider() {
 
@@ -36,40 +29,45 @@ class CallLogWidget : AppWidgetProvider() {
         const val ACTION_REFRESH     = "com.tvcs.fritzboxcallwidget.ACTION_REFRESH"
         const val ACTION_NEXT_FILTER = "com.tvcs.fritzboxcallwidget.ACTION_NEXT_FILTER"
 
+        /**
+         * Marks an ACTION_REFRESH broadcast as "render only, do not fetch".
+         * Set by [triggerRefresh], which [WidgetRefreshWorker] calls after it
+         * has *already* performed the network fetch. Without this flag,
+         * onReceive() would have no way to tell "the worker just finished,
+         * just show the result" apart from "the user tapped refresh, please
+         * fetch fresh data" — and mistakenly doing a second live fetch here
+         * is exactly what caused real Android ANR dialogs ("App reagiert
+         * nicht"): this class is a manifest BroadcastReceiver, and unlike a
+         * WorkManager Worker it IS subject to the ~10s broadcast ANR
+         * watchdog. This receiver must never perform network I/O itself —
+         * only ever render from cache, synchronously and fast, and delegate
+         * any actual fetch to WorkManager via [WidgetScheduler.forceRefreshNow].
+         */
+        private const val EXTRA_RENDER_ONLY   = "render_only"
+        private const val EXTRA_ERROR_MESSAGE = "error_message"
+
         /** Cycling order for the header filter button. */
         private val FILTER_CYCLE = listOf(
             "all", "missed", "incoming", "outgoing", "blocked", "voicemail", "fax"
         )
 
-        // Application-level scope for widget work that must outlive onReceive().
-        // goAsync() below keeps the BroadcastReceiver process alive while the
-        // coroutine is running, preventing the OS from killing the job mid-fetch.
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-        // Guards against overlapping fetches: a manual refresh tap, the
-        // exact-alarm tick, and the network-connectivity callback can all
-        // fire within moments of each other (e.g. during a flappy VPN
-        // transition). Without this, each would kick off its own concurrent
-        // fetchAndUpdateSuspend() call, all hitting the FritzBox in parallel
-        // and repeatedly overwriting the widget's RemoteViews mid-render —
-        // which is exactly what produces the perceived "hang". Only one
-        // fetch runs at a time; the rest are simply skipped (loading state
-        // stays visible; the in-flight fetch will refresh it shortly).
-        private val fetchInProgress = AtomicBoolean(false)
-
         private const val TAG = "CallLogWidget"
 
-        /** See fetchAndUpdateSuspend(): skip re-fetching if a successful fetch
-         *  landed within this many ms of the current ACTION_REFRESH trigger. */
-        private const val RECENT_REFRESH_GRACE_MS = 8_000L
-
-        fun triggerRefresh(context: Context) {
+        /**
+         * Called by [WidgetRefreshWorker] after it finishes its own fetch
+         * (success or failure) purely to have the widget re-render the
+         * result. [errorMessage] is passed along so the render-only path can
+         * show the right state without needing to touch the network itself.
+         */
+        fun triggerRefresh(context: Context, errorMessage: String? = null) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
             if (ids.isNotEmpty()) {
                 context.sendBroadcast(Intent(context, CallLogWidget::class.java).apply {
                     action = ACTION_REFRESH
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                    putExtra(EXTRA_RENDER_ONLY, true)
+                    errorMessage?.let { putExtra(EXTRA_ERROR_MESSAGE, it) }
                 })
             }
         }
@@ -93,21 +91,27 @@ class CallLogWidget : AppWidgetProvider() {
         // (falls BootReceiver nicht greift) sorgt onUpdate() dafür dass die
         // Alarm-Kette wieder anläuft.
         WidgetScheduler.scheduleExactAlarm(context)
-        for (id in ids) showLoading(context, manager, id)
-        launchFetch(context, manager, ids, goAsync())
+
+        // Render whatever is cached right away — fast and synchronous, no
+        // network I/O. If there's nothing cached yet, show loading and hand
+        // the actual fetch off to WorkManager (WidgetRefreshWorker), which,
+        // unlike this BroadcastReceiver, isn't bound by Android's ~10s
+        // broadcast ANR watchdog. This method must never block on network
+        // I/O itself — see EXTRA_RENDER_ONLY doc comment above for why.
+        val rendered = renderFromCache(context, manager, ids)
+        if (!rendered) {
+            for (id in ids) showLoading(context, manager, id)
+            WidgetScheduler.forceRefreshNow(context)
+        }
     }
 
     override fun onAppWidgetOptionsChanged(
         context: Context, manager: AppWidgetManager, id: Int, newOptions: Bundle
     ) {
-        val prefs  = AppPreferences(context)
-        val cached = CallRepository(prefs).getCachedEntries()
-        if (cached != null) {
-            val filtered = applyFilter(cached, prefs)
-            updateWidget(context, manager, id,
-                State.Success(filtered.take(prefs.maxEntries)), prefs)
-        } else {
-            launchFetch(context, manager, intArrayOf(id), goAsync())
+        val rendered = renderFromCache(context, manager, intArrayOf(id))
+        if (!rendered) {
+            showLoading(context, manager, id)
+            WidgetScheduler.forceRefreshNow(context)
         }
     }
 
@@ -118,11 +122,27 @@ class CallLogWidget : AppWidgetProvider() {
             ACTION_REFRESH -> {
                 val ids = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
                     ?: manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
-                for (id in ids) showLoading(context, manager, id)
-                // goAsync() tells Android to keep this process alive until
-                // pendingResult.finish() is called — without it the OS may
-                // kill the process before the coroutine fetch completes.
-                launchFetch(context, manager, ids, goAsync())
+                val renderOnly    = intent.getBooleanExtra(EXTRA_RENDER_ONLY, false)
+                val errorMessage  = intent.getStringExtra(EXTRA_ERROR_MESSAGE)
+                if (renderOnly) {
+                    // WidgetRefreshWorker already performed the fetch — just
+                    // show its result from cache. Never fetch again here:
+                    // this handler must stay fast and synchronous. Unlike a
+                    // WorkManager Worker, a manifest BroadcastReceiver IS
+                    // subject to Android's ANR watchdog, and a live network
+                    // fetch here (which used to happen) is exactly what
+                    // caused real "App reagiert nicht" dialogs.
+                    Log.d(TAG, "ACTION_REFRESH (render-only) — rendering from cache")
+                    renderFromCache(context, manager, ids, errorMessage)
+                } else {
+                    // Manual refresh tap (or any other ACTION_REFRESH sender
+                    // that isn't the worker): show loading immediately, then
+                    // hand the actual fetch off to WorkManager. This method
+                    // returns fast either way — no network I/O happens here.
+                    Log.d(TAG, "ACTION_REFRESH (fetch requested) — delegating to WorkManager")
+                    for (id in ids) showLoading(context, manager, id)
+                    WidgetScheduler.forceRefreshNow(context)
+                }
             }
             ACTION_NEXT_FILTER -> {
                 // Cycle to next filter value and refresh display from cache
@@ -131,14 +151,10 @@ class CallLogWidget : AppWidgetProvider() {
                 val next    = FILTER_CYCLE[(FILTER_CYCLE.indexOf(current) + 1) % FILTER_CYCLE.size]
                 prefs.callFilter = next
                 val ids = manager.getAppWidgetIds(ComponentName(context, CallLogWidget::class.java))
-                val cached = CallRepository(prefs).getCachedEntries()
-                if (cached != null) {
-                    val filtered = applyFilter(cached, prefs)
-                    for (id in ids)
-                        updateWidget(context, manager, id,
-                            State.Success(filtered.take(prefs.maxEntries)), prefs)
-                } else {
-                    launchFetch(context, manager, ids, goAsync())
+                val rendered = renderFromCache(context, manager, ids)
+                if (!rendered) {
+                    for (id in ids) showLoading(context, manager, id)
+                    WidgetScheduler.forceRefreshNow(context)
                 }
             }
         }
@@ -171,86 +187,41 @@ class CallLogWidget : AppWidgetProvider() {
             ?.let { allowed -> entries.filter { it.type in allowed } }
             ?: entries
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────
+    // ── Render (cache-only, synchronous, no network I/O) ────────────────────────
 
     /**
-     * Launches [fetchAndUpdateSuspend] guarded by [fetchInProgress] so that
-     * overlapping triggers (manual refresh tap, alarm tick, network-callback
-     * refresh, filter-cycle fallback) can never run concurrently. If a fetch
-     * is already in flight, this trigger is simply dropped — [pendingResult]
-     * is finished immediately so goAsync() doesn't keep the process pinned
-     * for no reason, and the in-flight fetch's own update will land shortly.
+     * Renders the widget(s) purely from whatever is already cached in
+     * [CallRepository], plus an optional [errorMessage] to overlay (used by
+     * the worker's render-only ACTION_REFRESH broadcast to convey a failed
+     * fetch without this receiver having to touch the network itself).
+     *
+     * This function is intentionally synchronous and fast — no coroutines,
+     * no network I/O, no goAsync(). That is the whole point: this class is a
+     * manifest BroadcastReceiver, and unlike a WorkManager Worker it IS
+     * subject to Android's broadcast ANR watchdog. Any actual fetch must be
+     * delegated to WorkManager via [WidgetScheduler.forceRefreshNow] instead.
+     *
+     * @return `false` if there was nothing to render (no cache and no error
+     *   — e.g. the very first time the widget is placed), so the caller
+     *   knows to show a loading placeholder and kick off a fetch.
      */
-    private fun launchFetch(
-        context: Context,
-        manager: AppWidgetManager,
-        ids: IntArray,
-        pendingResult: BroadcastReceiver.PendingResult
-    ) {
-        if (!fetchInProgress.compareAndSet(false, true)) {
-            Log.d(TAG, "Fetch already in progress — skipping duplicate trigger")
-            pendingResult.finish()
-            return
+    private fun renderFromCache(
+        context: Context, manager: AppWidgetManager, ids: IntArray, errorMessage: String? = null
+    ): Boolean {
+        val prefs  = AppPreferences(context)
+        val repo   = CallRepository(prefs)
+        val cached = repo.getCachedEntries()
+        if (cached == null && errorMessage == null) return false
+
+        val state: State = if (cached != null) {
+            val filtered = applyFilter(cached, prefs).take(prefs.maxEntries)
+            if (errorMessage != null) State.SuccessWithError(filtered, errorMessage)
+            else State.Success(filtered)
+        } else {
+            State.Error(errorMessage!!)
         }
-        scope.launch {
-            try {
-                fetchAndUpdateSuspend(context, manager, ids)
-            } finally {
-                fetchInProgress.set(false)
-                pendingResult.finish()
-            }
-        }
-    }
-
-    private suspend fun fetchAndUpdateSuspend(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        run {
-            val prefs = AppPreferences(context)
-            val repo  = CallRepository(prefs)
-
-            // Show cached data immediately
-            val cached = repo.getCachedEntries()
-            if (cached != null) {
-                val filtered = applyFilter(cached, prefs)
-                val s = State.Success(filtered.take(prefs.maxEntries))
-                for (id in ids) updateWidget(context, manager, id, s, prefs)
-            }
-
-            // WidgetRefreshWorker performs its own full fetchCallLog() on the
-            // scheduled alarm tick and then triggers this exact ACTION_REFRESH
-            // path purely to (re-)render — it does not pass its result along.
-            // Without this check, every scheduled tick would hit the FritzBox
-            // twice in a row (once in the worker, once here), needlessly
-            // doubling network load and the worst-case time before the widget
-            // settles. If a successful fetch just landed, the cache rendered
-            // above is already current, so skip the second round-trip.
-            val justRefreshed = cached != null &&
-                (System.currentTimeMillis() - prefs.lastSuccessfulRefreshMs) < RECENT_REFRESH_GRACE_MS
-            if (justRefreshed) {
-                Log.d(TAG, "Skipping redundant fetch — cache is ${
-                    (System.currentTimeMillis() - prefs.lastSuccessfulRefreshMs) / 1000
-                }s old")
-                return
-            }
-
-            val result = repo.fetchCallLog(context)
-            val state = result.fold(
-                onSuccess = { calls ->
-                    // Record the successful fetch time for staleness checks
-                    prefs.lastSuccessfulRefreshMs = System.currentTimeMillis()
-                    State.Success(calls.take(prefs.maxEntries))
-                },
-                onFailure = { error ->
-                    val c = repo.getCachedEntries()
-                    val filtered = c?.let { applyFilter(it, prefs) }
-                    if (filtered != null)
-                        State.SuccessWithError(filtered.take(prefs.maxEntries),
-                                               error.message ?: "Fehler")
-                    else
-                        State.Error(error.message ?: "Unknown error")
-                }
-            )
-            for (id in ids) updateWidget(context, manager, id, state, prefs)
-        }
+        for (id in ids) updateWidget(context, manager, id, state, prefs)
+        return true
     }
 
     private fun showLoading(context: Context, manager: AppWidgetManager, id: Int) {

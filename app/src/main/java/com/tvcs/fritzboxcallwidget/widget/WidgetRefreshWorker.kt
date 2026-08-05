@@ -32,25 +32,32 @@ class WidgetRefreshWorker(
 
     companion object {
         private const val TAG = "WidgetRefreshWorker"
+
+        /** Boolean input-data key: bypass the staleness/interval check and
+         *  fetch immediately. Set by [WidgetScheduler.forceRefreshNow]. */
+        const val INPUT_FORCE = "force"
     }
 
     override suspend fun doWork(): Result {
         val prefs = AppPreferences(context)
+        val force = inputData.getBoolean(INPUT_FORCE, false)
 
         // ── Staleness check ───────────────────────────────────────────────────
-        val intervalMs = prefs.refreshIntervalSeconds.toLong() * 1_000L
-        val lastMs     = prefs.lastSuccessfulRefreshMs
-        val elapsedMs  = System.currentTimeMillis() - lastMs
+        if (!force) {
+            val intervalMs = prefs.refreshIntervalSeconds.toLong() * 1_000L
+            val lastMs     = prefs.lastSuccessfulRefreshMs
+            val elapsedMs  = System.currentTimeMillis() - lastMs
 
-        if (lastMs > 0L && elapsedMs < intervalMs) {
-            Log.d(TAG, "Skipping refresh — only ${elapsedMs / 1000}s since last update " +
-                  "(interval ${prefs.refreshIntervalSeconds}s)")
-            // Re-arm alarm so the self-rescheduling chain continues
-            WidgetScheduler.scheduleExactAlarm(context)
-            return Result.success()
+            if (lastMs > 0L && elapsedMs < intervalMs) {
+                Log.d(TAG, "Skipping refresh — only ${elapsedMs / 1000}s since last update " +
+                      "(interval ${prefs.refreshIntervalSeconds}s)")
+                // Re-arm alarm so the self-rescheduling chain continues
+                WidgetScheduler.scheduleExactAlarm(context)
+                return Result.success()
+            }
         }
 
-        Log.d(TAG, "Refreshing widget (elapsed ${elapsedMs / 1000}s / interval ${prefs.refreshIntervalSeconds}s)")
+        Log.d(TAG, "Refreshing widget (force=$force)")
 
         // ── Direct fetch — no Broadcast intermediary ──────────────────────────
         // Using sendBroadcast() here is unreliable: Doze can delay or drop the
@@ -68,14 +75,16 @@ class WidgetRefreshWorker(
                 if (result.isSuccess) {
                     prefs.lastSuccessfulRefreshMs = System.currentTimeMillis()
                     Log.d(TAG, "Fetch succeeded — triggering widget update for ${ids.size} widget(s)")
+                    // Render-only broadcast: CallLogWidget must NOT fetch
+                    // again here, only show the result we already have.
+                    CallLogWidget.triggerRefresh(context)
                 } else {
-                    Log.w(TAG, "Fetch failed: ${result.exceptionOrNull()?.message} — using cached data")
+                    val msg = result.exceptionOrNull()?.message ?: "Unbekannter Fehler"
+                    Log.w(TAG, "Fetch failed: $msg — using cached data")
+                    // Pass the error message along so the render-only path
+                    // can show it without touching the network itself.
+                    CallLogWidget.triggerRefresh(context, errorMessage = msg)
                 }
-                // Delegate rendering to CallLogWidget via ACTION_REFRESH broadcast.
-                // At this point we are still in the worker's process which is kept
-                // alive by WorkManager — the broadcast will be dispatched immediately
-                // to our own process, not deferred.
-                CallLogWidget.triggerRefresh(context)
             }
 
             // Re-arm alarm so the self-rescheduling chain continues

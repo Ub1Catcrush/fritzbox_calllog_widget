@@ -24,7 +24,6 @@ import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.appbar.MaterialToolbar
 import com.tvcs.fritzboxcallwidget.R
 import com.tvcs.fritzboxcallwidget.api.CallRepository
-import com.tvcs.fritzboxcallwidget.widget.CallLogWidget
 import com.tvcs.fritzboxcallwidget.widget.WidgetScheduler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -440,7 +439,13 @@ class SettingsActivity : AppCompatActivity() {
         private fun scheduleWidgetRefresh() {
             lifecycleScope.launch {
                 delay(300)
-                CallLogWidget.triggerRefresh(requireContext())
+                // A settings change (credentials, host, filters, ...) can
+                // invalidate the cache, so this needs an actual fresh fetch —
+                // not just a cache re-render (that's what triggerRefresh()
+                // means now: it's reserved for WidgetRefreshWorker's
+                // render-only post-fetch broadcast). forceRefreshNow() runs
+                // the fetch via WorkManager, same as any other trigger.
+                WidgetScheduler.forceRefreshNow(requireContext())
             }
         }
 

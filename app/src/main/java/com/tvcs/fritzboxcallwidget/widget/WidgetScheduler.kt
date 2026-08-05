@@ -108,6 +108,31 @@ object WidgetScheduler {
         }
     }
 
+    /**
+     * Enqueue an immediate fetch, bypassing the staleness/interval check —
+     * used for user-initiated refreshes (manual refresh tap, or any
+     * BroadcastReceiver path that has no cache yet to show). Uses REPLACE so
+     * a manual request takes priority over a pending passive check that
+     * might otherwise no-op because the interval hasn't elapsed yet.
+     *
+     * Runs entirely inside WidgetRefreshWorker (a WorkManager Worker), which
+     * is NOT subject to the ~10s broadcast ANR watchdog the way
+     * CallLogWidget's BroadcastReceiver is — this is why the actual network
+     * fetch must always go through here rather than running inline in a
+     * receiver's onReceive()/onUpdate().
+     */
+    fun forceRefreshNow(context: Context) {
+        val request = OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
+            .addTag(TAG)
+            .setInputData(androidx.work.workDataOf(WidgetRefreshWorker.INPUT_FORCE to true))
+            .setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+        scheduleExactAlarm(context)
+        Log.d(TAG, "forceRefreshNow enqueued (unique, REPLACE, expedited)")
+    }
+
     private const val UNIQUE_WORK_NAME = "widget_refresh_if_stale"
 
     /**
